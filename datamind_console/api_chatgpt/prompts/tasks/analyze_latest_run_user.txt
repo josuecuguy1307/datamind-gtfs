@@ -1,0 +1,16 @@
+Task: analyze_latest_run
+
+Analyze one normalized AI Bot run snapshot.
+Return JSON only that strictly matches the response schema.
+
+Focus:
+- Explain top issues from the latest run context.
+- Distinguish signal vs missing evidence.
+- Recommend next advisory actions without execution framing.
+- Mark high-impact items and require operator confirmation.
+
+Snapshot JSON:
+{{snapshot_json}}
+
+Operator Context JSON:
+{{operator_context_json}}

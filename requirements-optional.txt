@@ -1,0 +1,2 @@
+# Optional model backend used only by the GPBoost training script.
+gpboost

@@ -1,0 +1,56 @@
+{
+  "model_name": "lgbm_lambdarank",
+  "model_version": "v1",
+  "feature_version": "v1",
+  "artifact_path": "phase4_models/lgbm/v1/model.txt",
+
+  "trained_at": "2026-01-13T23:59:00Z",
+  "training_code_version": "v1",
+  "training_dataset_version": "v1",
+
+  "train_summary": {
+    "train_rows": 0,
+    "valid_rows": 0,
+    "num_groups_train": 0,
+    "num_groups_valid": 0,
+    "candidates_per_group_avg": 0
+  },
+
+  "label_summary": {
+    "relevance_scale": [0, 1, 2],
+    "num_positive_labels": 0,
+    "num_total_labels": 0
+  },
+
+  "lgbm_params": {
+    "objective": "lambdarank",
+    "metric": "ndcg",
+    "learning_rate": 0.05,
+    "num_leaves": 63,
+    "min_data_in_leaf": 20,
+    "feature_fraction": 0.8,
+    "bagging_fraction": 0.8,
+    "bagging_freq": 1,
+    "lambda_l1": 0.0,
+    "lambda_l2": 0.0,
+    "max_depth": -1
+  },
+
+  "training_result": {
+    "best_iteration": 0,
+    "metrics_valid": {
+      "ndcg@1": 0.0,
+      "ndcg@3": 0.0,
+      "ndcg@5": 0.0,
+      "ndcg@10": 0.0
+    }
+  },
+
+  "data_snapshot": {
+    "routes_total": 0,
+    "evidence_records_total": 0,
+    "match_labels_total": 0
+  },
+
+  "notes": "V1 model trained from admin labels. Seed evidence mainly from Overpass."
+}

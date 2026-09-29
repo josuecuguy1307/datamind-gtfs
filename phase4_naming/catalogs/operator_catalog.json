@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "operators": [
+    {
+      "alias": "sample operator",
+      "canonical": "Sample Operator"
+    },
+    {
+      "alias": "sample cooperative",
+      "canonical": "Sample Cooperative"
+    }
+  ]
+}

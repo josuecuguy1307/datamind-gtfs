@@ -1,0 +1,361 @@
+{
+  "valhalla": {
+    "default_url": "http://127.0.0.1:8003",
+    "costing": "bus",
+    "shape_format": "polyline6",
+    "default_timeout_s": 60,
+    "waypoint_dedup_radius_m": 300.0,
+    "anchor_waypoint_skip_radius_m": 150.0
+  },
+  "stop_matching": {
+    "dedup_radius_m": 40.0,
+    "local_density_radius_m": 200.0,
+    "local_density_window": 20
+  },
+  "scoring": {
+    "on_route_threshold": 0.5,
+    "marginal_threshold": 0.32,
+    "marginal_threshold_ratio": 0.62,
+    "dedup_radius_m": 40.0,
+    "heuristic_weights": {
+      "distance_score": 0.34,
+      "buffer_score": 0.08,
+      "locality_consistency": 0.08,
+      "stop_usage_frequency": 0.06,
+      "operator_match": 0.1,
+      "cooperative_match": 0.05,
+      "locality_match": 0.07,
+      "bearing_alignment": 0.1,
+      "known_anchor_or_intermediate": 0.12
+    },
+    "distance_decay_divisor": 180.0,
+    "distance_decay_exponent": 1.15,
+    "buffer_base": 50.0,
+    "buffer_range": 350.0,
+    "usage_frequency_cap": 6.0,
+    "geography_penalties": {
+      "outside_expected_normal": 0.18,
+      "outside_expected_terminus_protected": 0.7,
+      "far_from_envelope_multiplier": 0.72,
+      "far_from_envelope_distance_m": 250.0,
+      "in_forbidden_area_normal": 0.05,
+      "in_forbidden_area_terminus_protected": 0.5,
+      "in_required_area_boost": 1.1
+    },
+    "generic_name_penalty": {
+      "unnamed_or_generic": 0.55,
+      "generic_prefix": 0.75,
+      "no_penalty": 1.0
+    },
+    "ensemble_defaults": {
+      "heuristic_weight_low_data": 0.65,
+      "lgbm_weight_low_data": 0.35,
+      "heuristic_weight_mid_data": 0.5,
+      "lgbm_weight_mid_data": 0.5,
+      "heuristic_weight_high_data": 0.35,
+      "lgbm_weight_high_data": 0.65,
+      "trainable_routes_low_threshold": 5,
+      "trainable_routes_mid_threshold": 10,
+      "overfit_heuristic_weight": 0.8,
+      "overfit_lgbm_weight": 0.2
+    }
+  },
+  "corridor": {
+    "quality_threshold": 0.6,
+    "max_attempts": 3,
+    "max_inflation_ratio_accept": 3.0,
+    "zone_overrides": {
+      "rural": {
+        "max_inflation_ratio": 5.0,
+        "absolute_max_corridor_km": 50.0
+      },
+      "rural_periurban": {
+        "max_inflation_ratio": 5.0,
+        "absolute_max_corridor_km": 50.0
+      },
+      "rural_to_urban": {
+        "max_inflation_ratio": 5.0,
+        "absolute_max_corridor_km": 50.0
+      },
+      "periurban": {
+        "max_inflation_ratio": 4.5,
+        "absolute_max_corridor_km": 45.0
+      },
+      "mixed": {
+        "max_inflation_ratio": 4.5,
+        "absolute_max_corridor_km": 45.0
+      },
+      "urban": {
+        "max_inflation_ratio": 3.5,
+        "absolute_max_corridor_km": 30.0
+      }
+    },
+    "buffer_passes": {
+      "short_route_km": 12,
+      "short_route_buffers": [
+        50,
+        100,
+        150
+      ],
+      "medium_route_km": 25,
+      "medium_route_buffers": [
+        50,
+        100,
+        200
+      ],
+      "long_route_buffers": [
+        50,
+        100,
+        200,
+        400
+      ]
+    },
+    "min_density_gap_m": 500.0,
+    "sparse_segment_gap_m": 1000,
+    "sparse_segment_gap_fraction": 0.15,
+    "pruning_improvement_threshold": 0.1,
+    "pruning_length_reduction_km": 6.0
+  },
+  "skeleton": {
+    "min_spacing_m": 80.0,
+    "sequence_dedup_radius_m": 80.0,
+    "terminus_cluster_radius_m": 250.0,
+    "max_stops_per_km": 5,
+    "marginal_promotion_threshold": 0.28,
+    "min_skeleton_target": 5,
+    "marginal_bootstrap_min_score": 0.2,
+    "max_thinning_iterations": 50,
+    "adaptive_gap_thresholds": {
+      "short_route_km": 10,
+      "short_gap_m": 600.0,
+      "short_gap_fraction": 0.08,
+      "medium_route_km": 25,
+      "medium_gap_m": 1000.0,
+      "medium_gap_fraction": 0.1,
+      "long_gap_m": 1500.0,
+      "long_gap_fraction": 0.12
+    },
+    "weak_segment_gap_m": 2000,
+    "express_skip_gap_m": 1500,
+    "terminus_zone_start_fraction": 0.05,
+    "terminus_zone_end_fraction": 0.95,
+    "confidence_gap_penalty": 0.1,
+    "confidence_weak_penalty": 0.15
+  },
+  "tail_relaxation": {
+    "min_score_tail": 0.32,
+    "tail_zone_start": 0.75,
+    "head_zone_end": 0.25,
+    "terminus_filler_distance_m": 1500.0,
+    "synthetic_proximity_m": 300.0,
+    "synthetic_score": 0.7
+  },
+  "terminus": {
+    "tolerance_m": 300.0,
+    "min_retained_fraction": 0.7,
+    "tolerance_by_type": {
+      "formal_terminal": 1.0,
+      "street_terminus": 1.4,
+      "neighborhood_endpoint": 1.25
+    }
+  },
+  "confidence": {
+    "zone_inflation_thresholds": {
+      "rural": {
+        "soft": 4.0,
+        "hard": 6.0
+      },
+      "rural_periurban": {
+        "soft": 4.0,
+        "hard": 6.0
+      },
+      "rural_to_urban": {
+        "soft": 4.0,
+        "hard": 6.0
+      },
+      "periurban": {
+        "soft": 3.5,
+        "hard": 5.0
+      },
+      "mixed": {
+        "soft": 3.5,
+        "hard": 5.0
+      },
+      "urban": {
+        "soft": 2.5,
+        "hard": 4.0
+      }
+    },
+    "inflation_over_hard_cap_factor": 0.5,
+    "terminus_miss_penalty": 0.85,
+    "rejected_geography_penalty": 0.1,
+    "sequence_monotonicity_weight": 0.5,
+    "sequence_regularity_weight": 0.25,
+    "sequence_density_weight": 0.25,
+    "max_anchor_bonus": 0.15,
+    "anchor_bonus_per_stop": 0.05,
+    "density_factors": {
+      "very_sparse_threshold": 0.5,
+      "very_sparse_factor": 0.6,
+      "sparse_threshold": 1.0,
+      "sparse_factor": 0.8,
+      "over_dense_threshold": 8.0,
+      "over_dense_factor": 0.75,
+      "no_corridor_factor": 0.7,
+      "normal_factor": 1.0
+    },
+    "coverage_weights": {
+      "extent": 0.35,
+      "endpoint_coverage": 0.25,
+      "gap_coverage": 0.25,
+      "min_stop_factor": 0.15
+    },
+    "coverage_gap_penalty_per_gap": 0.08,
+    "coverage_weak_penalty_per_weak": 0.12,
+    "coverage_min_stops": {
+      "below_3": 0.3,
+      "below_5": 0.6,
+      "normal": 1.0
+    },
+    "route_status_thresholds": {
+      "blocked_min_stops": 3,
+      "geometry_confirmed_geo_confidence": 0.4,
+      "geometry_confirmed_geo_plausibility": 0.6,
+      "geometry_confirmed_max_coverage": 0.4,
+      "geometry_confirmed_min_plausibility": 0.55,
+      "usable_geo_valid_score": 0.55,
+      "usable_sequence_confidence_with_catalog": 0.35,
+      "usable_min_stops_with_catalog": 5,
+      "usable_pass_through": 0.6,
+      "usable_geo_confidence_with_catalog": 0.2,
+      "usable_plausibility_no_catalog": 0.72,
+      "usable_sequence_confidence_no_catalog": 0.4,
+      "usable_geo_confidence_no_catalog": 0.2,
+      "usable_min_stops_no_catalog": 4,
+      "usable_relaxed_plausibility": 0.6,
+      "usable_relaxed_min_stops": 5,
+      "usable_relaxed_sequence_confidence": 0.35,
+      "usable_relaxed_geo_confidence": 0.15,
+      "weak_min_plausibility": 0.48,
+      "weak_min_stops": 3,
+      "geo_valid_blocked_score": 0.3
+    }
+  },
+  "constructor_v2": {
+    "valhalla_url": "http://127.0.0.1:8003",
+    "legacy_valhalla_url": "http://127.0.0.1:8003",
+    "duplicate_distance_m": 60.0,
+    "very_close_distance_m": 18.0,
+    "weak_stop_score_threshold": 0.35,
+    "weak_stop_default_penalty": 4000,
+    "valhalla_http_timeout_s": 45,
+    "valhalla_pair_timeout_s": 20,
+    "valhalla_status_timeout_s": 10,
+    "max_acceptable_detour_ratio": 3.2,
+    "max_strong_detour_ratio": 2.2,
+    "max_repeat_segment_ratio": 0.12,
+    "max_monotonic_regression": 0.03,
+    "max_corridor_switches": 3,
+    "objective_scale": 1,
+    "solver_time_limit_ms": 12000
+  },
+  "jurisdiction": {
+    "ruminahui_bbox": {
+      "south": -0.395,
+      "north": -0.285,
+      "west": -78.48,
+      "east": -78.39
+    },
+    "sample_operator_keywords": [
+      "sample operator"
+    ]
+  },
+  "hint_coherence": {
+    "token_quality_weights": {
+      "confirmed_stop": 1.0,
+      "terminal_confirmed": 1.0,
+      "terminal_candidate": 0.9,
+      "stop_candidate": 0.8,
+      "landmark": 0.6,
+      "station_anchor": 0.6,
+      "district_anchor": 0.5,
+      "sector": 0.5,
+      "neighborhood": 0.5,
+      "mixed_anchor": 0.7,
+      "mixed_area_corridor": 0.5,
+      "generic_token": 0.2
+    },
+    "score_weights": {
+      "straight_line_plausibility": 0.15,
+      "path_inflation": 0.15,
+      "ordering": 0.15,
+      "envelope_containment": 0.1,
+      "pass_through_compliance": 0.2,
+      "no_enter_compliance": 0.1,
+      "match_quality": 0.15
+    },
+    "path_inflation_thresholds": {
+      "good": 1.5,
+      "acceptable": 2.5,
+      "marginal": 4.0
+    },
+    "max_candidate_sets": 5,
+    "max_anchor_candidates": 3
+  },
+  "arterial_waypoints": {
+    "between_anchors_tolerance": 1.45,
+    "known_corridors": {
+      "sample_corridor": {
+        "triggers": [
+          "downtown",
+          "north"
+        ],
+        "waypoints": [
+          {
+            "lat": 19.4275,
+            "lon": -99.135,
+            "name": "Sample corridor - Downtown"
+          },
+          {
+            "lat": 19.45,
+            "lon": -99.14,
+            "name": "Sample corridor - North"
+          }
+        ]
+      }
+    }
+  },
+  "geographic_validator": {
+    "corridor_sample_step_divisor": 200,
+    "forbidden_violation_penalty": 0.3,
+    "distance_over_2x_max_score": 0.1,
+    "distance_over_max_score": 0.5,
+    "distance_under_half_min_score": 0.3,
+    "distance_marginal_score": 0.7,
+    "combined_score_weights": {
+      "pass_through": 0.4,
+      "no_violation": 0.3,
+      "distance": 0.3
+    },
+    "combined_pass_threshold": 0.6
+  },
+  "_metadata": {
+    "version": "1.0.0",
+    "description": "Centralized stop grounding configuration catalog. All thresholds extracted from hardcoded values in the stop grounding pipeline modules.",
+    "created": "2026-03-19",
+    "source_modules": [
+      "on_route_classifier.py",
+      "discovery_pipeline.py",
+      "corridor_stop_intersector.py",
+      "sequence_skeleton_builder.py",
+      "tail_relaxation.py",
+      "terminus_lock.py",
+      "confidence_architecture.py",
+      "corridor_builder.py",
+      "geographic_validator.py",
+      "hint_set_coherence.py",
+      "arterial_waypoints.py",
+      "constructor_v2/constants.py"
+    ]
+  }
+}

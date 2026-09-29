@@ -1,0 +1,23 @@
+# Phase 3 Coverage Operator Checklist
+
+- Confirm the target sector and current session goal.
+- Run Step05 extraction or verify the harvest already exists.
+- Run safe canonicalization if duplicate relation clusters are present.
+- Review the sector in the global catalog.
+- Review the sector in `Sector Coverage`.
+- Run `Sync coverage gaps from Phase 3 catalogs`.
+- Pick one gap and confirm its classification.
+- If `still_extractable`, confirm manual completion is still the right choice before proceeding.
+- Open the gap in Manual Sequence Builder.
+- Confirm the linked gap id, sector, route hint, and recommended stops look plausible.
+- Resolve validation errors before export.
+- Export the sequence to Phase 3.
+- Approve the canonical sequence.
+- Run Step30 and inspect the geometry candidates.
+- Run Step32 and review recovered versus ambiguous nearby stops.
+- Run Step35 if ranking is needed.
+- Run Step40 only after geometry review.
+- Confirm the gap is now `resolved`.
+- Confirm the global catalog shows the route in `prod`.
+- Confirm the route appears in the correct sector summary.
+- Leave notes on any manual override, unresolved blocker, or ambiguous route state.

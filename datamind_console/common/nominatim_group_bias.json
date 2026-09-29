@@ -1,0 +1,49 @@
+{
+  "version": "2.0",
+  "provinces": {
+    "sample_region": {
+      "_comment": "Search groups of the SAMPLE (synthetic) region. Replace them with your own region's.",
+      "default_group_key": "sample_city",
+      "group_query_bias": {
+        "sample_city": "Sample City, Sample Region",
+        "downtown": "Centro, Sample City",
+        "north": "Norte, Sample City"
+      },
+      "group_anchors": {
+        "sample_city": [
+          19.43,
+          -99.14
+        ],
+        "downtown": [
+          19.4275,
+          -99.135
+        ],
+        "north": [
+          19.45,
+          -99.14
+        ]
+      },
+      "group_classification_tokens": {
+        "downtown": {
+          "substrings": [
+            "downtown"
+          ],
+          "tokens": [
+            "downtown",
+            "plaza",
+            "terminal"
+          ]
+        },
+        "north": {
+          "substrings": [
+            "north"
+          ],
+          "tokens": [
+            "north",
+            "mercado"
+          ]
+        }
+      }
+    }
+  }
+}

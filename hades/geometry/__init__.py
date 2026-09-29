@@ -1,0 +1,41 @@
+"""HADES geometry — canonical primitives and direction thresholds."""
+
+from .canonical import (
+    OPPOSITION_DEG_THRESHOLD,
+    CORRIDOR_AGREE_DEG,
+    SYNTHESIS_PLAUSIBILITY_DEG,
+    RELIABLE_PAIR_SCORE,
+    PLAUSIBLE_PAIR_SCORE,
+    HARD_MERGE_M,
+    TIGHT_MERGE_BAND_M,
+    OVER_KEEP_BAND_M,
+    LATERAL_OFFSET_M,
+    EARTH_RADIUS_M,
+    haversine_m,
+    bearing,
+    bearing_deg,
+    angle_diff,
+    angular_delta_deg,
+    polyline_bearing_at,
+    lateral_offset_point,
+)
+
+__all__ = [
+    "OPPOSITION_DEG_THRESHOLD",
+    "CORRIDOR_AGREE_DEG",
+    "SYNTHESIS_PLAUSIBILITY_DEG",
+    "RELIABLE_PAIR_SCORE",
+    "PLAUSIBLE_PAIR_SCORE",
+    "HARD_MERGE_M",
+    "TIGHT_MERGE_BAND_M",
+    "OVER_KEEP_BAND_M",
+    "LATERAL_OFFSET_M",
+    "EARTH_RADIUS_M",
+    "haversine_m",
+    "bearing",
+    "bearing_deg",
+    "angle_diff",
+    "angular_delta_deg",
+    "polyline_bearing_at",
+    "lateral_offset_point",
+]

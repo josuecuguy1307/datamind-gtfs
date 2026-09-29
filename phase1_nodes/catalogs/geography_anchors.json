@@ -1,0 +1,26 @@
+{
+  "version": "2.0",
+  "provinces": {
+    "sample_region": {
+      "_comment": "SYNTHETIC reference points of the sample region. Replace them with your own region's.",
+      "anchors": {
+        "sample_downtown": {
+          "lat": 19.4275,
+          "lon": -99.135,
+          "radius_km": 3
+        },
+        "sample_north": {
+          "lat": 19.45,
+          "lon": -99.14,
+          "radius_km": 2
+        }
+      },
+      "operational_bbox": {
+        "south": 19.4,
+        "west": -99.18,
+        "north": 19.46,
+        "east": -99.1
+      }
+    }
+  }
+}

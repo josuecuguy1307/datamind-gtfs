@@ -1,0 +1,74 @@
+{
+  "version": "1.0",
+  "description": "Route quality validation rules and tier definitions for Phase 3 quality gate.",
+  "validation": {
+    "min_stops": 5,
+    "min_geometry_m": 3000,
+    "max_geometry_m": 150000,
+    "min_stops_per_km": 0.5,
+    "max_stops_per_km": 10.0,
+    "require_name": true,
+    "require_both_directions": false,
+    "require_valid_node_refs": true
+  },
+  "quality_tiers": {
+    "VERIFIED": {
+      "description": "Human-verified production route",
+      "min_confidence": 0.8,
+      "human_verified": true,
+      "min_stops": 5
+    },
+    "COMPLETE": {
+      "description": "Machine-constructed with full data",
+      "min_confidence": 0.5,
+      "min_stops": 5,
+      "has_name": true,
+      "has_geometry": true
+    },
+    "PARTIAL": {
+      "description": "Constructed but missing some data",
+      "min_confidence": 0.3,
+      "min_stops": 3
+    },
+    "PILOT": {
+      "description": "Minimal route, needs enrichment",
+      "max_stops": 4
+    },
+    "SUSPICIOUS": {
+      "description": "Flagged for review",
+      "triggers": [
+        "geometry_km < 3",
+        "stops < 5",
+        "stops_per_km > 10",
+        "missing_node_refs > 0",
+        "name is null"
+      ]
+    }
+  },
+  "auto_flag_rules": [
+    {
+      "name": "short_route",
+      "condition": "geometry_km < 3",
+      "severity": "warning",
+      "message": "Route geometry is under 3km — may be a construction error or neighborhood circulator"
+    },
+    {
+      "name": "few_stops",
+      "condition": "stops < 5",
+      "severity": "warning",
+      "message": "Route has fewer than 5 stops — likely incomplete"
+    },
+    {
+      "name": "dense_stops",
+      "condition": "stops_per_km > 10",
+      "severity": "info",
+      "message": "Very dense stop spacing — verify no duplicates"
+    },
+    {
+      "name": "orphan_nodes",
+      "condition": "missing_node_refs > 0",
+      "severity": "error",
+      "message": "stop_node_ids reference nonexistent nodes — must be cleaned"
+    }
+  ]
+}

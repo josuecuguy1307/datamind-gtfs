@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "bbox_sets": [
+    {
+      "bbox_id": "SAMPLE_CITY",
+      "label": "Sample City (full area)",
+      "description": "Synthetic example area",
+      "south": 19.4,
+      "west": -99.18,
+      "north": 19.46,
+      "east": -99.1
+    },
+    {
+      "bbox_id": "SAMPLE_DOWNTOWN",
+      "label": "Downtown (sample)",
+      "description": "Example sector",
+      "south": 19.415,
+      "west": -99.15,
+      "north": 19.44,
+      "east": -99.12
+    },
+    {
+      "bbox_id": "SAMPLE_NORTH",
+      "label": "North (sample)",
+      "description": "Example sector",
+      "south": 19.44,
+      "west": -99.16,
+      "north": 19.46,
+      "east": -99.12
+    }
+  ]
+}

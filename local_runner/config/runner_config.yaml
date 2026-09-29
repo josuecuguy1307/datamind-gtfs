@@ -1,0 +1,45 @@
+{
+  "runner": {
+    "timeout_seconds": 900,
+    "capture_stderr_separately": true,
+    "infer_target_from_filename": true,
+    "default_target": "codex",
+    "log_filename": "runs.jsonl",
+    "working_directory": "."
+  },
+  "clipboard": {
+    "clipboard_enabled": true,
+    "clipboard_prompt_filename_prefix": "clipboard_prompt",
+    "clipboard_max_chars": 200000,
+    "persist_clipboard_prompt": true,
+    "require_target_explicit_for_clipboard": true,
+    "clipboard_persist_destination": "inbox"
+  },
+  "watcher": {
+    "enabled": false,
+    "poll_interval_seconds": 5,
+    "max_concurrent_per_target": 1,
+    "watch_dir": "local_runner/inbox",
+    "auto_infer_target": true,
+    "default_target": "codex",
+    "ignored_prefixes": ["_", "."]
+  },
+  "paths": {
+    "inbox": "local_runner/inbox",
+    "processing": "local_runner/processing",
+    "done": "local_runner/done",
+    "failed": "local_runner/failed",
+    "results": "local_runner/results",
+    "logs": "local_runner/logs"
+  },
+  "targets": {
+    "codex": {
+      "command": ["codex", "exec", "--model", "gpt-5.2-codex", "--skip-git-repo-check", "-"],
+      "input_mode": "stdin"
+    },
+    "claude": {
+      "command": ["claude", "-p"],
+      "input_mode": "stdin"
+    }
+  }
+}

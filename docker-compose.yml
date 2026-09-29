@@ -1,0 +1,43 @@
+###############################################################################
+# DataMind — local infrastructure services
+# Usage:
+#   docker compose up -d          # start all
+#   docker compose up -d overpass # start just Overpass
+#   docker compose logs -f overpass
+#   docker compose down           # stop all
+###############################################################################
+
+services:
+  overpass:
+    image: wiktorn/overpass-api:latest
+    container_name: overpass-region
+    restart: unless-stopped
+    ports:
+      - "12346:80"
+    volumes:
+      - overpass-region-db:/db
+      - ./data/overpass/region-latest.osm.bz2:/import/region.osm.bz2:ro
+    environment:
+      OVERPASS_MODE: init
+      OVERPASS_PLANET_URL: "file:///import/region.osm.bz2"
+      OVERPASS_USE_AREAS: "false"
+      OVERPASS_FLUSH_SIZE: "4"
+      OVERPASS_MAX_TIMEOUT: "300s"
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+
+  # Valhalla is already running standalone; uncomment to manage here instead
+  # valhalla:
+  #   image: ghcr.io/gis-ops/valhalla:latest
+  #   container_name: valhalla
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8003:8002"
+  #   volumes:
+  #     - valhalla-tiles:/custom_files
+
+volumes:
+  overpass-region-db:
+    external: true

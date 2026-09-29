@@ -1,0 +1,58 @@
+{
+  "snapshot_id": "snap_run_low_evidence_2026_03_01",
+  "task": "analyze_latest_run",
+  "snapshot_source": "fixture",
+  "generated_at": "2026-03-01T12:00:00Z",
+  "context": {
+    "phase": "phase3",
+    "stage": "step_40_approve",
+    "run_context_key": "2026-02-28T22:10:00Z|phase3|step_40_approve|run_20260228_a|||"
+  },
+  "latest_run": {
+    "timestamp": "2026-02-28T22:10:00Z",
+    "run_id": "run_20260228_a",
+    "route_id": null,
+    "quality_score": 71.2,
+    "sequence_quality_score": 69.1,
+    "warning_count": 2,
+    "warnings": [
+      "low_phase3_coverage",
+      "operator_labels_missing"
+    ],
+    "reorder_recommended": false,
+    "reorder_confidence": 0.42
+  },
+  "baseline": {
+    "history_count": 3,
+    "quality_score_baseline": 73.4,
+    "warning_count_baseline": 1.7
+  },
+  "coverage": {
+    "phase3_run_logs_7d": 0,
+    "operator_feedback_rows_30d": 0,
+    "phase1_run_logs_3d": 20,
+    "model_metrics_3d": 4,
+    "train_events_3d": 4
+  },
+  "insufficient_data_flags": [
+    "phase3_live_evidence_low",
+    "operator_labels_low"
+  ],
+  "evidence_refs": [
+    {
+      "evidence_id": "ev_run_latest",
+      "kind": "run_log",
+      "description": "Latest available Phase3 run after cleanup period"
+    },
+    {
+      "evidence_id": "ev_cov_phase3_7d",
+      "kind": "coverage_counter",
+      "description": "Phase3 run logs in last 7 days"
+    },
+    {
+      "evidence_id": "ev_cov_operator_feedback_30d",
+      "kind": "coverage_counter",
+      "description": "Operator feedback rows in last 30 days"
+    }
+  ]
+}

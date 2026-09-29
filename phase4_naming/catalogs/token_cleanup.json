@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "replacements": {
+    "  ": " ",
+    " - ": " - ",
+    " las ": " Las ",
+    " la ": " La ",
+    " de ": " de "
+  },
+  "strip_tokens": [
+    "route",
+    "ruta"
+  ]
+}

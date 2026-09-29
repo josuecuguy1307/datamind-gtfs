@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HadesEvidenceConsistencyCheckerResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contradictions_found",
+    "contradictions",
+    "consistency_summary"
+  ],
+  "properties": {
+    "contradictions_found": {
+      "type": "boolean"
+    },
+    "contradictions": {
+      "type": "array",
+      "maxItems": 25,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "severity",
+          "details",
+          "likely_implication"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "details": {
+            "type": "string",
+            "maxLength": 2500
+          },
+          "likely_implication": {
+            "type": "string",
+            "enum": [
+              "extractor_failure_unlikely",
+              "validator_mapping_bug",
+              "scoring_inconsistency",
+              "stale_payload",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "consistency_summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    }
+  }
+}

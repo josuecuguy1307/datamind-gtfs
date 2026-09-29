@@ -1,0 +1,16 @@
+Task: review_ai_bot_quality
+
+Meta-review AI Bot quality using telemetry snapshot data.
+Return JSON only that strictly matches the response schema.
+
+Focus:
+- Warning quality/noise and coverage bottlenecks.
+- Readiness blockers and data sufficiency.
+- Tuning and logging improvements, prioritized.
+- Keep all outputs advisory-only.
+
+Snapshot JSON:
+{{snapshot_json}}
+
+Operator Context JSON:
+{{operator_context_json}}

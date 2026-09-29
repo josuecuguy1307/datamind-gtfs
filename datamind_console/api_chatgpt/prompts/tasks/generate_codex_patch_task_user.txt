@@ -1,0 +1,17 @@
+Task: generate_codex_patch_task
+
+Generate a scoped Codex patch-task prompt from evidence.
+Return JSON only that strictly matches the response schema.
+
+Constraints:
+- Patch task must remain advisory and safety-constrained.
+- No destructive automation.
+- No gate bypass logic.
+- Include a ready-to-paste prompt_text.
+- If evidence is weak, clearly state uncertainty and safe fallback scope.
+
+Snapshot JSON:
+{{snapshot_json}}
+
+Operator Context JSON:
+{{operator_context_json}}

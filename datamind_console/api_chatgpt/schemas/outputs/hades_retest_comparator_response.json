@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HadesRetestComparatorResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "task",
+    "summary",
+    "result",
+    "confidence",
+    "comparability_assessment",
+    "attribution_assessment",
+    "metric_deltas",
+    "recommendation",
+    "recommended_next_actions",
+    "risk_notes"
+  ],
+  "properties": {
+    "mode": {"type": "string", "const": "advisory_only"},
+    "task": {"type": "string", "const": "hades_retest_comparator"},
+    "summary": {"type": "string", "minLength": 1, "maxLength": 5000},
+    "result": {
+      "type": "string",
+      "enum": ["improved", "regressed", "inconclusive"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "comparability_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["is_comparable", "notes"],
+      "properties": {
+        "is_comparable": {"type": "boolean"},
+        "notes": {
+          "type": "array",
+          "items": {"type": "string", "maxLength": 1200},
+          "maxItems": 24
+        }
+      }
+    },
+    "attribution_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["likely_attributable", "confounders"],
+      "properties": {
+        "likely_attributable": {"type": "boolean"},
+        "confounders": {
+          "type": "array",
+          "items": {"type": "string", "maxLength": 1200},
+          "maxItems": 24
+        }
+      }
+    },
+    "metric_deltas": {
+      "type": "array",
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["metric", "before", "after", "delta", "interpretation"],
+        "properties": {
+          "metric": {"type": "string", "maxLength": 160},
+          "before": {"type": ["number", "string", "null"]},
+          "after": {"type": ["number", "string", "null"]},
+          "delta": {"type": ["number", "string", "null"]},
+          "interpretation": {"type": "string", "maxLength": 800}
+        }
+      }
+    },
+    "recommendation": {
+      "type": "string",
+      "enum": ["accept", "rollback", "observe_more", "manual_review"]
+    },
+    "recommended_next_actions": {
+      "type": "array",
+      "items": {"type": "string", "maxLength": 1000},
+      "maxItems": 20
+    },
+    "risk_notes": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "message"],
+        "properties": {
+          "code": {"type": "string", "maxLength": 160},
+          "severity": {"type": "string", "enum": ["low", "medium", "high"]},
+          "message": {"type": "string", "maxLength": 1200}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AIBotTaskRequestEnvelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task", "snapshot", "safety_context"],
+  "properties": {
+    "task": {
+      "type": "string",
+      "enum": [
+        "analyze_latest_run",
+        "review_ai_bot_quality",
+        "hades_patch_task_generator",
+        "hades_retest_comparator",
+        "generate_codex_patch_task",
+        "hades_geography_interpreter",
+        "hades_evidence_consistency_checker",
+        "hades_pipeline_interpreter",
+        "interpret_pipeline_blocker",
+        "prioritize_pipeline_resolution",
+        "explain_cleanup_risk",
+        "interpret_merge_evidence"
+      ]
+    },
+    "snapshot": {
+      "type": "object",
+      "description": "Normalized snapshot JSON consumed by prompts.",
+      "additionalProperties": true
+    },
+    "operator_context": {
+      "type": ["object", "null"],
+      "additionalProperties": true
+    },
+    "legacy_task": {
+      "type": "boolean",
+      "description": "Explicit opt-in for compatibility endpoints to use legacy non-HADES prompt templates."
+    },
+    "use_legacy_template": {
+      "type": "boolean",
+      "description": "Compatibility alias for legacy prompt selection."
+    },
+    "force_legacy_template": {
+      "type": "boolean",
+      "description": "Compatibility alias for forcing legacy prompt selection."
+    },
+    "safety_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "execution_authority",
+        "destructive_actions_allowed"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "const": "advisory_only"
+        },
+        "execution_authority": {
+          "type": "string",
+          "const": "runtime_validators_operator"
+        },
+        "destructive_actions_allowed": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    }
+  }
+}

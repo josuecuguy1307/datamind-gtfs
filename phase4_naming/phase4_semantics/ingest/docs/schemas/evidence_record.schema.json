@@ -1,0 +1,77 @@
+{
+  "name": "evidence_records_schema",
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "records": {
+        "type": "array",
+        "description": "Normalized evidence records ready to insert into semantics.route_evidence_records.",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "source_type": {
+              "type": "string",
+              "description": "doc_pdf | doc_excel | official_gis | osm_overpass_seed | manual"
+            },
+            "source_id": {
+              "type": ["string", "null"],
+              "description": "file_id, URL, dataset id, or other reference."
+            },
+            "source_title": {
+              "type": ["string", "null"],
+              "description": "Human title like 'Valle de los Chillos Routes PDF 2026'."
+            },
+            "route_ref": {
+              "type": ["string", "null"]
+            },
+            "route_name": {
+              "type": ["string", "null"]
+            },
+            "operator": {
+              "type": ["string", "null"]
+            },
+            "from_place": {
+              "type": ["string", "null"]
+            },
+            "to_place": {
+              "type": ["string", "null"]
+            },
+            "aliases": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "tags": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "confidence_hint": {
+              "type": ["number", "null"],
+              "description": "0..1 confidence to weight the evidence source."
+            },
+            "raw": {
+              "type": "object",
+              "description": "Raw payload for traceability (original row text + metadata)."
+            }
+          },
+          "required": [
+            "source_type",
+            "source_id",
+            "source_title",
+            "route_ref",
+            "route_name",
+            "operator",
+            "from_place",
+            "to_place",
+            "aliases",
+            "tags",
+            "confidence_hint",
+            "raw"
+          ]
+        }
+      }
+    },
+    "required": ["records"]
+  }
+}

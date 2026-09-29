@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "poi_filters": [
+    {
+      "id": "food_and_daily",
+      "label": "Food + daily life",
+      "amenity_rx": "restaurant|cafe|fast_food|bar|marketplace|pharmacy|hospital|clinic|school",
+      "shop_rx": "supermarket|convenience|bakery|mall|department_store",
+      "tourism_rx": "attraction|museum"
+    },
+    {
+      "id": "commerce_mall",
+      "label": "Commerce + malls",
+      "amenity_rx": "bank|atm|marketplace|restaurant|cafe",
+      "shop_rx": "mall|department_store|supermarket|convenience|clothes|electronics",
+      "tourism_rx": ""
+    },
+    {
+      "id": "health_education",
+      "label": "Health + education",
+      "amenity_rx": "hospital|clinic|pharmacy|doctors|school|university|college",
+      "shop_rx": "",
+      "tourism_rx": ""
+    },
+    {
+      "id": "tourism_culture",
+      "label": "Tourism + culture",
+      "amenity_rx": "arts_centre|theatre|library|cinema",
+      "shop_rx": "gift|books",
+      "tourism_rx": "attraction|museum|viewpoint|gallery"
+    },
+    {
+      "id": "minimal_transport_support",
+      "label": "Minimal transport support",
+      "amenity_rx": "restaurant|cafe|pharmacy|hospital",
+      "shop_rx": "supermarket|convenience",
+      "tourism_rx": ""
+    }
+  ]
+}

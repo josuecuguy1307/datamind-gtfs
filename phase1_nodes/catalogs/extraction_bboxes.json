@@ -1,0 +1,19 @@
+{
+  "version": "2.0",
+  "provinces": {
+    "sample_region": {
+      "downtown": {
+        "south": 19.415,
+        "west": -99.15,
+        "north": 19.44,
+        "east": -99.12
+      },
+      "north": {
+        "south": 19.44,
+        "west": -99.16,
+        "north": 19.46,
+        "east": -99.12
+      }
+    }
+  }
+}

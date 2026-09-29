@@ -1,0 +1,28 @@
+{
+  "_comment": "Primary tag category classification for node features. Mirrors _TAG_CATEGORY_MAP in features_job.py.",
+  "categories": ["TRANSIT", "COMMERCIAL", "CIVIC", "RECREATION", "OTHER"],
+  "rules": [
+    {"key": "highway", "value": "bus_stop", "category": "TRANSIT"},
+    {"key": "public_transport", "value": "platform", "category": "TRANSIT"},
+    {"key": "public_transport", "value": "stop_position", "category": "TRANSIT"},
+    {"key": "public_transport", "value": "station", "category": "TRANSIT"},
+    {"key": "amenity", "value": "bus_station", "category": "TRANSIT"},
+    {"key": "railway", "value": "tram_stop", "category": "TRANSIT"},
+    {"key": "railway", "value": "halt", "category": "TRANSIT"},
+    {"key": "railway", "value": "station", "category": "TRANSIT"},
+    {"key": "amenity", "value": "cafe", "category": "COMMERCIAL"},
+    {"key": "amenity", "value": "restaurant", "category": "COMMERCIAL"},
+    {"key": "amenity", "value": "pharmacy", "category": "COMMERCIAL"},
+    {"key": "amenity", "value": "bank", "category": "COMMERCIAL"},
+    {"key": "amenity", "value": "fast_food", "category": "COMMERCIAL"},
+    {"key": "amenity", "value": "fuel", "category": "COMMERCIAL"},
+    {"key": "amenity", "value": "school", "category": "CIVIC"},
+    {"key": "amenity", "value": "hospital", "category": "CIVIC"},
+    {"key": "amenity", "value": "clinic", "category": "CIVIC"},
+    {"key": "amenity", "value": "police", "category": "CIVIC"},
+    {"key": "amenity", "value": "place_of_worship", "category": "CIVIC"},
+    {"key": "amenity", "value": "townhall", "category": "CIVIC"},
+    {"key": "amenity", "value": "park", "category": "RECREATION"},
+    {"key": "leisure", "value": "park", "category": "RECREATION"}
+  ]
+}

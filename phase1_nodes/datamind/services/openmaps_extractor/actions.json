@@ -1,0 +1,85 @@
+{
+  "version": 2,
+  "actions": [
+    {
+      "id": "stops_quality_bbox",
+      "label": "stops_quality_bbox",
+      "template": "templates/stops_quality_bbox.ql",
+      "params_schema": { "bbox": "required", "timeout_s": "optional" },
+      "default_params": { "timeout_s": 120 },
+      "outputs": ["stops_candidates"]
+    },
+    {
+      "id": "stops_broad_bbox",
+      "label": "stops_broad_bbox",
+      "template": "templates/stops_broad_bbox.ql",
+      "params_schema": { "bbox": "required", "timeout_s": "optional" },
+      "default_params": { "timeout_s": 120 },
+      "outputs": ["stops_candidates"]
+    },
+    {
+      "id": "platforms_bbox",
+      "label": "platforms_bbox",
+      "template": "templates/platforms_bbox.ql",
+      "params_schema": { "bbox": "required", "timeout_s": "optional" },
+      "default_params": { "timeout_s": 120 },
+      "outputs": ["stops_candidates"]
+    },
+    {
+      "id": "stops_named_regex_bbox",
+      "label": "stops_named_regex_bbox",
+      "template": "templates/stops_named_regex_bbox.ql",
+      "params_schema": { "bbox": "required", "name_rx": "optional", "timeout_s": "optional" },
+      "default_params": { "timeout_s": 120, "name_rx": ".*" },
+      "outputs": ["stops_candidates"]
+    },
+    {
+      "id": "stops_operator_regex_bbox",
+      "label": "stops_operator_regex_bbox",
+      "template": "templates/stops_operator_regex_bbox.ql",
+      "params_schema": { "bbox": "required", "operator_rx": "optional", "timeout_s": "optional" },
+      "default_params": { "timeout_s": 120, "operator_rx": ".*" },
+      "outputs": ["stops_candidates"]
+    },
+    {
+      "id": "stops_ref_regex_bbox",
+      "label": "stops_ref_regex_bbox",
+      "template": "templates/stops_ref_regex_bbox.ql",
+      "params_schema": { "bbox": "required", "ref_rx": "optional", "timeout_s": "optional" },
+      "default_params": { "timeout_s": 120, "ref_rx": ".*" },
+      "outputs": ["stops_candidates"]
+    },
+    {
+      "id": "terminals_and_stations_bbox",
+      "label": "terminals_and_stations_bbox",
+      "template": "templates/terminals_and_stations_bbox.ql",
+      "params_schema": { "bbox": "required", "timeout_s": "optional" },
+      "default_params": { "timeout_s": 150 },
+      "outputs": ["stops_candidates"]
+    },
+    {
+      "id": "poi_transit_support_bbox",
+      "label": "poi_transit_support_bbox",
+      "template": "templates/poi_transit_support_bbox.ql",
+      "params_schema": { "bbox": "required", "amenity_rx": "optional", "shop_rx": "optional", "tourism_rx": "optional", "timeout_s": "optional" },
+      "default_params": { "timeout_s": 120, "amenity_rx": "restaurant|cafe|marketplace|pharmacy|hospital|school", "shop_rx": "supermarket|convenience|mall|department_store", "tourism_rx": "attraction|museum" },
+      "outputs": ["poi_context"]
+    },
+    {
+      "id": "route_relations_bus",
+      "label": "route_relations_bus",
+      "template": "templates/route_relations_bus.ql",
+      "params_schema": { "bbox": "required", "timeout_s": "optional" },
+      "default_params": { "timeout_s": 180 },
+      "outputs": ["route_relations"]
+    },
+    {
+      "id": "road_network_primary",
+      "label": "road_network_primary",
+      "template": "templates/road_network_primary.ql",
+      "params_schema": { "bbox": "required", "timeout_s": "optional" },
+      "default_params": { "timeout_s": 120 },
+      "outputs": ["road_context"]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+Task: hades_retest_comparator
+
+Compare baseline vs retest HADES pipeline evidence after a tuning or patch change.
+Return JSON only and strictly follow the response schema.
+
+Context:
+- advisory_only: true
+- role: retest_evaluator
+- execution_authority: runtime_validators_operator
+- do_not_bypass_gates: true
+- do_not_auto_approve_sensitive_actions: true
+
+You must:
+1. Determine whether baseline and retest are comparable.
+2. Flag confounders (policy/threshold/context/manual changes) that weaken attribution.
+3. Compare metric deltas explicitly (before/after/delta + interpretation).
+4. Classify result as improved/regressed/inconclusive.
+5. Recommend one next action: accept, rollback, observe_more, or manual_review.
+6. Avoid pass-rate-only conclusions.
+
+Retest comparison snapshot:
+{{snapshot_json}}
+
+Operator context:
+{{operator_context_json}}

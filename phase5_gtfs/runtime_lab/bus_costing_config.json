@@ -1,0 +1,10 @@
+{
+  "costing_options": {
+    "bus": {
+      "top_speed": 70,
+      "bus_penalty": 0,
+      "use_highways": 0.2,
+      "country_crossing_penalty": 0
+    }
+  }
+}

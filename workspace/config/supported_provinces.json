@@ -1,0 +1,52 @@
+{
+  "version": "2.0",
+  "country": {
+    "name": "Sample Country",
+    "iso": "XX"
+  },
+  "provinces": {
+    "sample_region": {
+      "active": true,
+      "capital": "Sample City",
+      "default_jurisdiction_codes": [
+        "SAMPLE"
+      ],
+      "display_name": "Sample Region",
+      "iso_code": "XX-M",
+      "nominatim_bias": "Sample City, Sample Region",
+      "nominatim_group_bias_refinements": {
+        "downtown": "Centro, Sample City",
+        "north": "Norte, Sample City"
+      },
+      "nominatim_viewbox": "-99.18,19.46,-99.1,19.4",
+      "operational_bbox": {
+        "east": -99.1,
+        "north": 19.46,
+        "south": 19.4,
+        "west": -99.18
+      },
+      "operator_keywords": [
+        "sample operator"
+      ],
+      "status": "sample",
+      "valhalla_port": 8003
+    }
+  },
+  "province_template": {
+    "active": false,
+    "capital": "",
+    "default_jurisdiction_codes": [],
+    "display_name": "",
+    "iso_code": "",
+    "nominatim_bias": "",
+    "operational_bbox": {
+      "east": 0,
+      "north": 0,
+      "south": 0,
+      "west": 0
+    },
+    "operator_keywords": [],
+    "status": "planned",
+    "valhalla_port": 8003
+  }
+}

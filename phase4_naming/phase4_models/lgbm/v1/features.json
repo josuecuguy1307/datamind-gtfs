@@ -1,0 +1,11 @@
+{
+  "feature_version": "v1",
+  "features": [
+    "fts_rank",
+    "trgm_name_sim",
+    "ref_match",
+    "operator_match",
+    "endpoint_dist_m",
+    "bbox_overlap"
+  ]
+}

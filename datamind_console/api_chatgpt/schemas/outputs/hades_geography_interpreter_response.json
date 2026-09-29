@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HadesGeographyInterpreterResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "task",
+    "interpreted_place_meaning",
+    "interpretation_source",
+    "interpretation_status",
+    "interpretation_confidence",
+    "bbox_candidate",
+    "area_group_hint",
+    "sector_hint",
+    "corridor_hint",
+    "fallback_reason"
+  ],
+  "properties": {
+    "mode": {
+      "type": "string",
+      "const": "advisory_only"
+    },
+    "task": {
+      "type": "string",
+      "const": "hades_geography_interpreter"
+    },
+    "interpreted_place_meaning": {
+      "type": ["string", "null"],
+      "maxLength": 500
+    },
+    "interpretation_source": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "interpretation_status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "ambiguous",
+        "unresolved",
+        "invalid_explicit_bbox",
+        "fallback_default_bbox"
+      ]
+    },
+    "interpretation_confidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "bbox_candidate": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["south", "west", "north", "east"],
+      "properties": {
+        "south": {"type": "number"},
+        "west": {"type": "number"},
+        "north": {"type": "number"},
+        "east": {"type": "number"}
+      }
+    },
+    "area_group_hint": {
+      "type": ["string", "null"],
+      "maxLength": 200
+    },
+    "sector_hint": {
+      "type": ["string", "null"],
+      "maxLength": 200
+    },
+    "corridor_hint": {
+      "type": ["string", "null"],
+      "maxLength": 200
+    },
+    "fallback_reason": {
+      "type": ["string", "null"],
+      "maxLength": 500
+    }
+  }
+}

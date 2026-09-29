@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InterpretMergeEvidenceResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "task",
+    "summary",
+    "confidence",
+    "risk_flags",
+    "insufficient_data_flags",
+    "operator_confirmation_required",
+    "evidence_used",
+    "merge_assessment",
+    "recommended_actions"
+  ],
+  "properties": {
+    "mode": {"type": "string", "const": "advisory_only"},
+    "task": {"type": "string", "const": "interpret_merge_evidence"},
+    "summary": {"type": "string", "minLength": 1, "maxLength": 5000},
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["band", "score", "reasons"],
+      "properties": {
+        "band": {"type": "string", "enum": ["low", "medium", "high"]},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "reasons": {"type": "array", "items": {"type": "string", "maxLength": 500}, "maxItems": 12}
+      }
+    },
+    "risk_flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "message"],
+        "properties": {
+          "code": {"type": "string", "maxLength": 120},
+          "severity": {"type": "string", "enum": ["low", "medium", "high"]},
+          "message": {"type": "string", "maxLength": 800}
+        }
+      },
+      "maxItems": 25
+    },
+    "insufficient_data_flags": {"type": "array", "items": {"type": "string", "maxLength": 200}, "maxItems": 25},
+    "operator_confirmation_required": {"type": "boolean"},
+    "evidence_used": {"type": "array", "items": {"type": "string", "maxLength": 120}, "maxItems": 60},
+    "merge_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confidence_label", "opposite_direction_likelihood", "recommendation"],
+      "properties": {
+        "confidence_label": {"type": "string", "enum": ["low", "medium", "high"]},
+        "opposite_direction_likelihood": {"type": "number", "minimum": 0, "maximum": 1},
+        "recommendation": {"type": "string", "maxLength": 1200}
+      }
+    },
+    "recommended_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action_id", "priority", "description", "high_impact", "requires_operator_confirmation", "evidence_refs"],
+        "properties": {
+          "action_id": {"type": "string", "maxLength": 120},
+          "priority": {"type": "string", "enum": ["p0", "p1", "p2", "p3"]},
+          "description": {"type": "string", "maxLength": 1200},
+          "high_impact": {"type": "boolean"},
+          "requires_operator_confirmation": {"type": "boolean"},
+          "evidence_refs": {"type": "array", "items": {"type": "string", "maxLength": 120}, "maxItems": 20}
+        }
+      },
+      "maxItems": 25
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "description": "Retention policy for constructor_artifacts/. Formalizes logic from scripts/cleanup_artifacts.sh.",
+  "artifacts_dir": "constructor_artifacts/",
+  "retention": {
+    "prod_routes": {
+      "policy": "KEEP_FOREVER",
+      "description": "Artifacts for routes promoted to route_prod"
+    },
+    "recent_runs": {
+      "keep_days": 30,
+      "description": "Any run completed within the last 30 days"
+    },
+    "failed_runs": {
+      "keep_days": 7,
+      "description": "Failed or abandoned construction runs"
+    },
+    "benchmark_artifacts": {
+      "policy": "KEEP_LATEST_3",
+      "description": "Keep only the 3 most recent benchmark runs per scenario"
+    },
+    "always_keep": [
+      "constructor_v2_v1/",
+      "constructor_v2_compare/",
+      "gtfs_final/"
+    ]
+  },
+  "cleanup": {
+    "max_total_size_gb": 5.0,
+    "alert_threshold_gb": 8.0,
+    "max_delete_per_run": 100,
+    "dry_run_first": true,
+    "log_deletions": true,
+    "log_file": "constructor_artifacts/.cleanup_log.jsonl"
+  },
+  "schedule": "weekly"
+}

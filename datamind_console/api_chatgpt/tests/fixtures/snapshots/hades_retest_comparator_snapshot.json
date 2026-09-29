@@ -1,0 +1,67 @@
+{
+  "snapshot_id": "snap_retest_fixture_001",
+  "task": "hades_retest_comparator",
+  "snapshot_source": "fixture",
+  "generated_at": "2026-03-03T00:00:00Z",
+  "change_type": "patch_detector_scoring",
+  "phase": "phase3",
+  "step_focus": "P3.2_SEQUENCE_STEP20",
+  "baseline_run_snapshot": {
+    "label": "baseline",
+    "run_id": "run-baseline-17",
+    "timestamp": "2026-03-02T18:10:00Z",
+    "phase": "phase3",
+    "step_id": "P3.2_SEQUENCE_STEP20",
+    "route_id": "route-991",
+    "metrics": {
+      "quality_score": 0.62,
+      "sequence_quality_score": 63.0,
+      "warning_count": 6,
+      "unmatched_count": 8,
+      "ambiguous_count": 4
+    },
+    "warnings": [
+      "step20_unmatched_blocking",
+      "sequence_quality_low"
+    ]
+  },
+  "retest_run_snapshot": {
+    "label": "retest",
+    "run_id": "run-retest-21",
+    "timestamp": "2026-03-03T01:05:00Z",
+    "phase": "phase3",
+    "step_id": "P3.2_SEQUENCE_STEP20",
+    "route_id": "route-991",
+    "metrics": {
+      "quality_score": 0.74,
+      "sequence_quality_score": 77.0,
+      "warning_count": 3,
+      "unmatched_count": 3,
+      "ambiguous_count": 2
+    },
+    "warnings": [
+      "sequence_warning_noise"
+    ]
+  },
+  "extra_context": {
+    "policy_profile_before": "balanced",
+    "policy_profile_after": "balanced",
+    "threshold_config_changed": false,
+    "manual_changes_applied": false,
+    "phase2_partial_rerun": false,
+    "notes": "Re-test after detector/scoring patch."
+  },
+  "insufficient_data_flags": [],
+  "evidence_refs": [
+    {
+      "evidence_id": "ev_retest_baseline",
+      "kind": "run_log",
+      "description": "Baseline run evidence"
+    },
+    {
+      "evidence_id": "ev_retest_latest",
+      "kind": "run_log",
+      "description": "Retest run evidence"
+    }
+  ]
+}

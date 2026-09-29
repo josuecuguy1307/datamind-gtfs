@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "description": "Territorial jurisdictions of the SAMPLE (synthetic) region. Replace them with your own region's.",
+  "jurisdictions": {
+    "SAMPLE": {
+      "label": "Sample City",
+      "authority": "Sample Transport Authority",
+      "territorial_keys": [
+        "sample city",
+        "downtown",
+        "north",
+        "sample terminal"
+      ],
+      "bbox": {
+        "south": 19.4,
+        "west": -99.18,
+        "north": 19.46,
+        "east": -99.1
+      }
+    }
+  },
+  "resolution_rules": {
+    "primary_key_match": "exact match on territorial_key → jurisdiction",
+    "bbox_fallback": "if no key match, check point_in_bbox against jurisdiction bbox",
+    "default_jurisdiction": "DMQ"
+  },
+  "valle_locality_keys": [],
+  "generic_geography_hints": []
+}

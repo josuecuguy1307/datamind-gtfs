@@ -1,0 +1,47 @@
+Interpret this HADES pipeline event snapshot and return a structured diagnostic JSON following the required schema.
+
+Context
+
+autopilot_mode: supervised
+
+role: interpreter (routing + diagnostics only)
+
+do_not_bypass_gates: true
+
+do_not_auto_approve_sensitive_actions: true
+
+What you must do for this event
+
+Detect evidence contradictions (executor vs validator vs AI Bot)
+
+Classify dominant cause
+
+Choose the correct branch
+
+Recommend concrete next actions
+
+Decide if a patch task should be created (and what kind)
+
+Be specific (no generic advisory wording)
+
+If snapshot contains ai_bot.extractor_help_needed / ai_bot.extractor_status:
+
+- Use these signals explicitly for branch recommendation and patch-type prioritization.
+- Respect partial_evidence by reducing escalation aggressiveness.
+- Do not default to patch_extractor when Step20-poor evidence indicates node_db_gap/matching_ambiguity/detector issues.
+
+Event snapshot
+
+{{EVENT_SNAPSHOT_JSON}}
+
+Optional recent history (if available)
+
+{{RECENT_HISTORY_SUMMARY_JSON_OR_NULL}}
+
+Optional policy profile
+
+{{POLICY_PROFILE_JSON_OR_NULL}}
+
+Additional instruction (important)
+
+If the block appears caused by validator/scoring/payload inconsistency rather than actual extractor failure, explicitly recommend patch_detector_scoring (or diagnostics patch), not patch_extractor.

@@ -1,0 +1,51 @@
+{
+  "mode": "advisory_only",
+  "task": "analyze_latest_run",
+  "summary": "Latest run looks operational but evidence is shallow after scoped cleanup. Risk interpretation should remain conservative until fresh Phase3 and operator-label data accumulate.",
+  "confidence": {
+    "band": "low",
+    "score": 0.38,
+    "reasons": [
+      "Phase3 evidence volume is currently low",
+      "Operator feedback labels are absent",
+      "Signals rely on small recent baseline"
+    ]
+  },
+  "risk_flags": [
+    {
+      "code": "phase3_evidence_low",
+      "severity": "medium",
+      "message": "Phase3 live logs are currently sparse, so trend confidence is limited."
+    }
+  ],
+  "insufficient_data_flags": [
+    "phase3_live_evidence_low",
+    "operator_labels_low"
+  ],
+  "operator_confirmation_required": true,
+  "evidence_used": [
+    "ev_run_latest",
+    "ev_cov_phase3_7d",
+    "ev_cov_operator_feedback_30d"
+  ],
+  "top_issues": [
+    {
+      "issue_id": "issue_low_phase3_coverage",
+      "title": "Low Phase3 evidence after cleanup",
+      "severity": "medium",
+      "description": "Recent run evidence is not yet sufficient for high-confidence readiness interpretation.",
+      "impact": "Can produce unstable trend conclusions and under/over-estimate readiness.",
+      "evidence_refs": ["ev_cov_phase3_7d"]
+    }
+  ],
+  "recommended_actions": [
+    {
+      "action_id": "action_collect_phase3_runs",
+      "priority": "p0",
+      "description": "Collect fresh Phase3 runs before changing readiness thresholds.",
+      "high_impact": false,
+      "requires_operator_confirmation": true,
+      "evidence_refs": ["ev_cov_phase3_7d"]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+// 040_opensearch_places_alias_search.json  OpenSearch index for semantic alias search (kNN vector) NOTE: set "dimension" to your embedding dim (example: 384).
+
+{
+  "settings": {
+    "index": { "knn": true }
+  },
+  "mappings": {
+    "properties": {
+      "place_id":   { "type": "keyword" },
+      "alias_id":   { "type": "keyword" },
+
+      "alias":      { "type": "text" },
+      "norm_alias": { "type": "keyword" },
+
+      "place_type": { "type": "keyword" },
+      "region":     { "type": "keyword" },
+
+      "model_name": { "type": "keyword" },
+
+      "embedding":  { "type": "knn_vector", "dimension": 384 }
+    }
+  }
+}

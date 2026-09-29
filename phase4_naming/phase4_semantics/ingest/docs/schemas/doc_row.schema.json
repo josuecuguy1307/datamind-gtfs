@@ -1,0 +1,66 @@
+{
+  "name": "doc_rows_schema",
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "rows": {
+        "type": "array",
+        "description": "Extracted rows representing transit route entries from the document.",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "route_ref": {
+              "type": ["string", "null"],
+              "description": "Route short ref/code/number like 'E1', 'A12', 'Ruta 23'."
+            },
+            "route_name": {
+              "type": ["string", "null"],
+              "description": "Human readable route name if present."
+            },
+            "operator": {
+              "type": ["string", "null"],
+              "description": "Company/cooperative/operator name if present."
+            },
+            "from_place": {
+              "type": ["string", "null"],
+              "description": "Origin terminal/neighborhood if present."
+            },
+            "to_place": {
+              "type": ["string", "null"],
+              "description": "Destination terminal/neighborhood if present."
+            },
+            "via": {
+              "type": "array",
+              "description": "Optional intermediate places/landmarks mentioned.",
+              "items": { "type": "string" }
+            },
+            "service_type": {
+              "type": ["string", "null"],
+              "description": "Optional: bus, feeder, metrobus, interparish, etc."
+            },
+            "direction_hint": {
+              "type": ["string", "null"],
+              "description": "Optional: a short direction clue such as 'Ida/Vuelta', 'Norte-Sur', etc."
+            },
+            "raw_text": {
+              "type": ["string", "null"],
+              "description": "Raw snippet or reconstructed row text for traceability."
+            },
+            "page": {
+              "type": ["integer", "null"],
+              "description": "Page number if the row came from a PDF page."
+            },
+            "confidence": {
+              "type": ["number", "null"],
+              "description": "0..1 confidence for this row extraction."
+            }
+          },
+          "required": ["route_ref", "route_name", "operator", "from_place", "to_place", "via", "service_type", "direction_hint", "raw_text", "page", "confidence"]
+        }
+      }
+    },
+    "required": ["rows"]
+  }
+}

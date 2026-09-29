@@ -1,0 +1,18 @@
+[project]
+name = "route-constructor"
+version = "0.1.0"
+description = "Phase 3 Route Constructor (geometry) - DataMind/DataMind pipeline"
+requires-python = ">=3.10"
+dependencies = [
+  "ortools>=9.14",
+  "psycopg2-binary>=2.9",
+  "requests>=2.31",
+  "shapely>=2.1",
+]
+
+[tool.setuptools]
+packages = ["src"]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"

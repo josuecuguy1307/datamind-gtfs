@@ -1,0 +1,12 @@
+{
+  "size": 50,
+  "query": {
+    "knn": {
+      "vector": {
+        "vector": "{{QUERY_VECTOR}}",
+        "k": 50,
+        "num_candidates": 200
+      }
+    }
+  }
+}

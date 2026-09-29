@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "templates": [
+    "{name}",
+    "{from} - {to}",
+    "{ref} {from} - {to}",
+    "{operator} {from} - {to}",
+    "{ref} {name}"
+  ]
+}

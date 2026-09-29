@@ -1,0 +1,29 @@
+name: valhalla_constructor_v2
+
+services:
+  valhalla_constructor_v2:
+    image: valhalla-local
+    container_name: valhalla_constructor_v2
+    ports:
+      - "8003:8002"
+    environment:
+      use_tiles_ignore_pbf: "True"
+      build_tar: "True"
+      serve_tiles: "True"
+      update_existing_config: "True"
+      server_threads: "8"
+    volumes:
+      - ./constructor_v2_runtime:/custom_files
+      - ./valhalla_constructor_v2.json:/custom_files/valhalla.json
+      - ./tiles:/custom_files/valhalla_tiles:ro
+      - ./extracts:/custom_files/extracts:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -X POST http://127.0.0.1:8002/locate -H 'Content-Type: application/json' -d '{\"locations\":[{\"lat\":-0.227916,\"lon\":-78.506679}],\"costing\":\"bus\"}' >/dev/null"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s

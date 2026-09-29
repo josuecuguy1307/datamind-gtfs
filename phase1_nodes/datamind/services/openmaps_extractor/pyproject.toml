@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openmaps-extractor"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+  "requests",
+  "psycopg2-binary",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]

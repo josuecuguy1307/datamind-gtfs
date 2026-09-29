@@ -1,0 +1,28 @@
+{
+  "size": 50,
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "knn": {
+            "vector": {
+              "vector": "{{QUERY_VECTOR}}",
+              "k": 50,
+              "num_candidates": 200,
+              "boost": 0.6
+            }
+          }
+        },
+        {
+          "match": {
+            "alias_text": {
+              "query": "{{QUERY_TEXT}}",
+              "fuzziness": "AUTO",
+              "boost": 0.4
+            }
+          }
+        }
+      ]
+    }
+  }
+}

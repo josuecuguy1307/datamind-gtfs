@@ -1,0 +1,62 @@
+{
+  "snapshot_id": "snap_quality_low_labels_2026_03_01",
+  "task": "review_ai_bot_quality",
+  "snapshot_source": "fixture",
+  "generated_at": "2026-03-01T12:00:00Z",
+  "quality_inputs": {
+    "runs_analyzed": 24,
+    "feedback_rows": 0,
+    "avg_warning_per_run": 1.3,
+    "missing_field_rate": 0.02,
+    "false_warning_proxy_rate": null,
+    "recommendation_useful_rate": null,
+    "sequence_warning_correct_rate": null
+  },
+  "coverage": {
+    "phase1_run_logs_3d": 20,
+    "phase3_run_logs_7d": 0,
+    "model_metrics_3d": 4,
+    "train_events_3d": 4,
+    "operator_feedback_rows_30d": 0
+  },
+  "readiness": {
+    "phase1_quality_score": {
+      "status": "not_ready",
+      "missing": ["operator_labels", "phase3_live_coverage"]
+    },
+    "phase3_sequence_risk": {
+      "status": "not_ready",
+      "missing": ["phase3_live_coverage", "operator_labels"]
+    }
+  },
+  "sanity_summary": {
+    "issue_count": 1,
+    "severity_counts": {
+      "low": 1,
+      "medium": 0,
+      "high": 0
+    }
+  },
+  "insufficient_data_flags": [
+    "phase3_live_evidence_low",
+    "operator_labels_low",
+    "feedback_signal_missing"
+  ],
+  "evidence_refs": [
+    {
+      "evidence_id": "ev_quality_cards",
+      "kind": "self_review_cards",
+      "description": "Self review cards from AI Insights"
+    },
+    {
+      "evidence_id": "ev_cov_phase3_7d",
+      "kind": "coverage_counter",
+      "description": "Phase3 run logs in last 7 days"
+    },
+    {
+      "evidence_id": "ev_feedback_rows_30d",
+      "kind": "coverage_counter",
+      "description": "Operator feedback rows in last 30 days"
+    }
+  ]
+}

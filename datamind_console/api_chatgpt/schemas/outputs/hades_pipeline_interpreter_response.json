@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HadesPipelineInterpreterResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "summary",
+    "dominant_cause_class",
+    "confidence",
+    "secondary_causes",
+    "evidence_consistency_checks",
+    "recommended_branch",
+    "recommended_next_actions",
+    "patch_task_recommendation",
+    "operator_action_required",
+    "approval_type_if_needed",
+    "risk_notes"
+  ],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 5000
+    },
+    "dominant_cause_class": {
+      "type": "string",
+      "enum": [
+        "extractor_logic",
+        "extractor_config",
+        "node_db_gap",
+        "matching_ambiguity",
+        "detector_thresholds",
+        "scoring_logic",
+        "diagnostics_visibility",
+        "merge_evidence",
+        "infra_timeout",
+        "unknown"
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "secondary_causes": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["class", "confidence", "note"],
+        "properties": {
+          "class": {
+            "type": "string",
+            "enum": [
+              "extractor_logic",
+              "extractor_config",
+              "node_db_gap",
+              "matching_ambiguity",
+              "detector_thresholds",
+              "scoring_logic",
+              "diagnostics_visibility",
+              "merge_evidence",
+              "infra_timeout",
+              "unknown"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1200
+          }
+        }
+      }
+    },
+    "evidence_consistency_checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contradictions_found", "contradictions"],
+      "properties": {
+        "contradictions_found": {
+          "type": "boolean"
+        },
+        "contradictions": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "details"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "details": {
+                "type": "string",
+                "maxLength": 2000
+              }
+            }
+          }
+        }
+      }
+    },
+    "recommended_branch": {
+      "type": "string",
+      "enum": [
+        "tuning_retry",
+        "phase1_new_nodes",
+        "patch_extractor",
+        "patch_detector_scoring",
+        "patch_diagnostics",
+        "no_patch_continue",
+        "manual_review_required"
+      ]
+    },
+    "recommended_next_actions": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "string",
+        "maxLength": 1000
+      }
+    },
+    "patch_task_recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "should_create_patch_task",
+        "patch_type",
+        "justification",
+        "suggested_target"
+      ],
+      "properties": {
+        "should_create_patch_task": {
+          "type": "boolean"
+        },
+        "patch_type": {
+          "type": ["string", "null"],
+          "enum": ["extractor", "detector_scoring", "diagnostics", null]
+        },
+        "justification": {
+          "type": ["string", "null"],
+          "maxLength": 2000
+        },
+        "suggested_target": {
+          "type": ["string", "null"],
+          "enum": ["codex", "claude", "either", null]
+        }
+      }
+    },
+    "operator_action_required": {
+      "type": "boolean"
+    },
+    "approval_type_if_needed": {
+      "type": ["string", "null"],
+      "maxLength": 160
+    },
+    "risk_notes": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "message"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1200
+          }
+        }
+      }
+    }
+  }
+}

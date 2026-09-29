@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "actions": [
+    {
+      "id": "stops_quality_bbox",
+      "template": "templates/stops_quality_bbox.ql",
+      "params_schema": { "bbox": "required" },
+      "default_params": { "timeout_s": 60 },
+      "outputs": ["stops_candidates"]
+    },
+    {
+      "id": "stops_broad_bbox",
+      "template": "templates/stops_broad_bbox.ql",
+      "params_schema": { "bbox": "required" },
+      "default_params": { "timeout_s": 60 },
+      "outputs": ["stops_candidates"]
+    },
+    {
+      "id": "platforms_bbox",
+      "template": "templates/platforms_bbox.ql",
+      "params_schema": { "bbox": "required" },
+      "default_params": { "timeout_s": 60 },
+      "outputs": ["stops_candidates"]
+    }
+  ]
+}

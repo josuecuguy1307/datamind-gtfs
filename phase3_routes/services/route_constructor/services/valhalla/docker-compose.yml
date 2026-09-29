@@ -1,0 +1,11 @@
+services:
+  valhalla:
+    image: valhalla-local
+    container_name: valhalla
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./valhalla.json:/custom_files/valhalla.json
+      - ./extracts:/custom_files/extracts
+      - ./tiles:/custom_files/valhalla_tiles
+

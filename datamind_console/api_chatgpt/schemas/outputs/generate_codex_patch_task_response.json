@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GenerateCodexPatchTaskResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "task",
+    "summary",
+    "confidence",
+    "risk_flags",
+    "insufficient_data_flags",
+    "operator_confirmation_required",
+    "evidence_used",
+    "patch_task"
+  ],
+  "properties": {
+    "mode": {"type": "string", "const": "advisory_only"},
+    "task": {"type": "string", "const": "generate_codex_patch_task"},
+    "summary": {"type": "string", "minLength": 1, "maxLength": 5000},
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["band", "score", "reasons"],
+      "properties": {
+        "band": {"type": "string", "enum": ["low", "medium", "high"]},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "reasons": {
+          "type": "array",
+          "items": {"type": "string", "maxLength": 500},
+          "maxItems": 12
+        }
+      }
+    },
+    "risk_flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "message"],
+        "properties": {
+          "code": {"type": "string", "maxLength": 120},
+          "severity": {"type": "string", "enum": ["low", "medium", "high"]},
+          "message": {"type": "string", "maxLength": 800}
+        }
+      },
+      "maxItems": 25
+    },
+    "insufficient_data_flags": {
+      "type": "array",
+      "items": {"type": "string", "maxLength": 200},
+      "maxItems": 25
+    },
+    "operator_confirmation_required": {"type": "boolean"},
+    "evidence_used": {
+      "type": "array",
+      "items": {"type": "string", "maxLength": 120},
+      "maxItems": 60
+    },
+    "patch_task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "goal",
+        "scope",
+        "constraints",
+        "prompt_text",
+        "expected_files",
+        "acceptance_criteria",
+        "high_impact_notes"
+      ],
+      "properties": {
+        "title": {"type": "string", "maxLength": 300},
+        "goal": {"type": "string", "maxLength": 1200},
+        "scope": {
+          "type": "array",
+          "items": {"type": "string", "maxLength": 300},
+          "maxItems": 40
+        },
+        "constraints": {
+          "type": "array",
+          "items": {"type": "string", "maxLength": 300},
+          "maxItems": 40
+        },
+        "prompt_text": {
+          "type": "string",
+          "minLength": 40,
+          "maxLength": 30000
+        },
+        "expected_files": {
+          "type": "array",
+          "items": {"type": "string", "maxLength": 300},
+          "maxItems": 50
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {"type": "string", "maxLength": 500},
+          "maxItems": 40
+        },
+        "high_impact_notes": {
+          "type": "array",
+          "items": {"type": "string", "maxLength": 400},
+          "maxItems": 20
+        }
+      }
+    }
+  }
+}
