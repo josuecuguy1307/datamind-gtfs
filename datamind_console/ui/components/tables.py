@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional, Sequence, List, Literal, Union
 
 import streamlit as st
 import pandas as pd
+from datamind_console.i18n import t
 
 
 Align = Literal["left", "center", "right"]
@@ -70,7 +71,7 @@ def render_table(
     st.markdown(f"#### {title}")
 
     if df is None or df.empty:
-        st.info("No rows to display.")
+        st.info(t("ui.misc.tables.no_rows_display"))
         return
 
     if columns:
@@ -92,7 +93,7 @@ def render_ranked_table(
     st.markdown(f"#### {title}")
 
     if df is None or df.empty:
-        st.info("No rows to display.")
+        st.info(t("ui.misc.tables.no_rows_display"))
         return
 
     if score_col in df.columns:
@@ -112,11 +113,11 @@ def select_row(
     st.markdown(f"#### {title}")
 
     if df is None or df.empty:
-        st.info("No items to select.")
+        st.info(t("ui.misc.tables.no_items_select"))
         return None
 
     if id_col not in df.columns:
-        st.error(f"Missing id column: {id_col}")
+        st.error(t("ui.misc.tables.missing_id_column_id_col", id_col=(id_col)))
         return None
 
     if label_cols is None:
@@ -134,7 +135,7 @@ def select_row(
     labels = [o["label"] for o in options]
     idx = max(0, min(default_index, len(labels) - 1))
 
-    chosen_label = st.selectbox("Select", labels, index=idx)
+    chosen_label = st.selectbox(t("ui.misc.tables.select"), labels, index=idx)
     chosen = next((o for o in options if o["label"] == chosen_label), None)
     return chosen["id"] if chosen else None
 
@@ -146,7 +147,7 @@ def render_key_value_table(
     st.markdown(f"#### {title}")
 
     if not data:
-        st.info("No data.")
+        st.info(t("ui.misc.tables.no_data"))
         return
 
     rows = [{"key": k, "value": v} for k, v in data.items()]
@@ -164,7 +165,7 @@ def render_hotspot_table(
     st.markdown(f"#### {title}")
 
     if not rows:
-        st.info("No hotspots.")
+        st.info(t("ui.misc.tables.no_hotspots"))
         return
 
     df = pd.DataFrame(list(rows))

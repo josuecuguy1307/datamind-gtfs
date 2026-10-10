@@ -488,6 +488,9 @@ def _persist_winner(
     # Node insert and the audit event must land atomically: if the event
     # insert raises (CHECK violation, FK mismatch, connection drop), roll the
     # node insert back so we never have a node row without its audit trail.
+    # Bound before the try: if _insert_node itself raises, the handler below
+    # must still log and roll back instead of failing on an unbound name.
+    node_id: Optional[str] = None
     try:
         node_id = _insert_node(
             conn,

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import threading
-from pathlib import Path
 from typing import Any, Optional
 
+from datamind_console.db import ai_schema as _ai_schema
+from datamind_console.db import schema_guard as _schema_guard
 from datamind_console.db.db import db_conn, exec_many, exec_sql, fetch_all, fetch_one
 
 SUGGESTION_TYPES = {"approve", "reject", "promote", "review", "investigate"}
@@ -31,99 +32,21 @@ def _as_phase(phase: Any) -> str:
     return str(phase).strip()
 
 
-def _sql_dir() -> Path:
-    return Path(__file__).resolve().parents[1] / "sql"
-
-
 def _ensure_ai_schema() -> None:
+    """Verify, read-only, that the AI bot schema exists.
+
+    This used to execute ``004``/``006`` plus an inline bootstrap (now
+    ``sql/004b_ai_schedule_escalations_bootstrap.sql``) whenever objects were
+    missing, from any request path. Applying it is now explicit:
+    ``python -m datamind_console.db.schema_cli apply ai.learning --yes``.
+    """
     global _AI_SCHEMA_READY
     if _AI_SCHEMA_READY:
         return
     with _AI_SCHEMA_LOCK:
         if _AI_SCHEMA_READY:
             return
-        with db_conn() as conn:
-            probe = fetch_one(
-                conn,
-                """
-                SELECT
-                  to_regclass('ai.ai_suggestions') IS NOT NULL AS has_suggestions,
-                  to_regclass('ai.ai_agent_schedule') IS NOT NULL AS has_schedule,
-                  to_regclass('ai.ai_bot_run_logs') IS NOT NULL AS has_bot_logs
-                """,
-            ) or {}
-            if bool(probe.get("has_suggestions")) and bool(probe.get("has_schedule")) and bool(probe.get("has_bot_logs")):
-                _AI_SCHEMA_READY = True
-                return
-
-            sql_files = [
-                _sql_dir() / "004_ai_learning_agent.sql",
-                _sql_dir() / "006_ai_insights_bot_logs.sql",
-            ]
-            with conn.cursor() as cur:
-                for path in sql_files:
-                    if not path.exists():
-                        continue
-                    sql = path.read_text(encoding="utf-8")
-                    if sql.strip():
-                        cur.execute(sql)
-
-                # Keep schedule/escalations bootstrap local to AI schema only.
-                # We intentionally avoid executing full 005 migration here because it
-                # also touches GTFS schema/tables that may be managed elsewhere.
-                cur.execute(
-                    """
-                    CREATE SCHEMA IF NOT EXISTS ai;
-
-                    CREATE TABLE IF NOT EXISTS ai.ai_agent_schedule (
-                      schedule_id INTEGER PRIMARY KEY DEFAULT 1,
-                      enabled BOOLEAN NOT NULL DEFAULT FALSE,
-                      timezone TEXT NOT NULL DEFAULT 'America/Guayaquil',
-                      days_of_week INTEGER[] NOT NULL DEFAULT ARRAY[1,2,3,4,5,6,7],
-                      start_time_local TIME NOT NULL DEFAULT TIME '09:00',
-                      end_time_local TIME NOT NULL DEFAULT TIME '18:00',
-                      interval_seconds INTEGER NOT NULL DEFAULT 600,
-                      run_once_now BOOLEAN NOT NULL DEFAULT FALSE,
-                      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                      updated_by TEXT NULL
-                    );
-
-                    INSERT INTO ai.ai_agent_schedule (
-                      schedule_id,
-                      enabled,
-                      timezone,
-                      days_of_week,
-                      start_time_local,
-                      end_time_local,
-                      interval_seconds,
-                      run_once_now,
-                      updated_by
-                    )
-                    VALUES
-                      (1, FALSE, 'America/Guayaquil', ARRAY[1,2,3,4,5,6,7], TIME '09:00', TIME '18:00', 600, FALSE, NULL)
-                    ON CONFLICT (schedule_id) DO NOTHING;
-
-                    CREATE TABLE IF NOT EXISTS ai.ai_escalations (
-                      escalation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                      status TEXT NOT NULL DEFAULT 'open'
-                        CHECK (status IN ('open', 'sent', 'resolved', 'failed')),
-                      error_type TEXT NOT NULL,
-                      error_message TEXT NOT NULL,
-                      stacktrace TEXT NOT NULL,
-                      context JSONB NOT NULL DEFAULT '{}'::jsonb,
-                      codex_request JSONB NULL,
-                      codex_response JSONB NULL,
-                      resolution_notes TEXT NULL
-                    );
-
-                    CREATE INDEX IF NOT EXISTS idx_ai_escalations_status_created
-                      ON ai.ai_escalations(status, created_at DESC);
-
-                    CREATE INDEX IF NOT EXISTS idx_ai_escalations_created
-                      ON ai.ai_escalations(created_at DESC);
-                    """
-                )
+        _schema_guard.require(_ai_schema.AI_LEARNING, connection_factory=db_conn)
         _AI_SCHEMA_READY = True
 
 

@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
+from datamind_console.common.env import PROJECT_ROOT
 from datamind_console.phases.phase3_routes.client import (
     Phase3Client,
     _classify_discover_attempt_error,
@@ -38,7 +39,7 @@ class Phase3ExtractorDiagnosticsTests(unittest.TestCase):
         import sys
 
         pkg_root = os.path.join(
-            str(Path(__file__).resolve().parents[4]),
+            str(PROJECT_ROOT),
             "phase3_routes",
             "services",
             "route_constructor",
@@ -730,30 +731,26 @@ class Phase3ExtractorDiagnosticsTests(unittest.TestCase):
         self.assertEqual(cmd[cmd.index("--name") + 1], "Ecovia")
 
     def test_run_step05_discover_failure_lists_attempted_overpass_urls(self) -> None:
+        # The fallback list grew a local Overpass (127.0.0.1:12346) after this
+        # test was written; fail every attempt instead of a fixed three.
         client = self._client()
-        with patch(
-            "datamind_console.phases.phase3_routes.client._run_script",
-            side_effect=[
-                subprocess.CompletedProcess(
-                    args=["05_discover_relation.py"],
-                    returncode=1,
-                    stdout="",
-                    stderr="RuntimeError: Overpass returned non-JSON response. HTTP 200. Body: <?xml version='1.0'?>",
-                ),
-                subprocess.CompletedProcess(
-                    args=["05_discover_relation.py"],
-                    returncode=1,
-                    stdout="",
-                    stderr="Gateway timeout 504",
-                ),
-                subprocess.CompletedProcess(
-                    args=["05_discover_relation.py"],
-                    returncode=1,
-                    stdout="",
-                    stderr="Gateway timeout 504",
-                ),
-            ],
-        ):
+        attempted: list[str] = []
+        failures = iter(
+            [
+                "RuntimeError: Overpass returned non-JSON response. HTTP 200. Body: <?xml version='1.0'?>",
+            ]
+        )
+
+        def _fail(cmd, env_overrides=None, **_kwargs):
+            attempted.append((env_overrides or {}).get("OVERPASS_URL"))
+            return subprocess.CompletedProcess(
+                args=["05_discover_relation.py"],
+                returncode=1,
+                stdout="",
+                stderr=next(failures, "Gateway timeout 504"),
+            )
+
+        with patch("datamind_console.phases.phase3_routes.client._run_script", side_effect=_fail):
             with self.assertRaises(RuntimeError) as ctx:
                 client.run_step_05_discover(
                     route_id=None,
@@ -763,6 +760,9 @@ class Phase3ExtractorDiagnosticsTests(unittest.TestCase):
                 )
         msg = str(ctx.exception)
         self.assertIn("Attempted Overpass URLs:", msg)
+        self.assertGreaterEqual(len(attempted), 3)
+        for url in attempted:
+            self.assertIn(url, msg)
         self.assertIn("https://overpass-api.de/api/interpreter", msg)
         self.assertIn("https://maps.mail.ru/osm/tools/overpass/api/interpreter", msg)
 

@@ -14,7 +14,7 @@ time except the swap-service action itself.
 from __future__ import annotations
 
 import json
-import os
+from contextlib import contextmanager
 from typing import Any, Optional
 
 import pandas as pd
@@ -23,6 +23,13 @@ import psycopg2.extras
 import pydeck as pdk
 import streamlit as st
 
+import logging
+import uuid as _uuid
+
+from datamind_console.db import console_repo
+from datamind_console.db.db import active_dsn, read_only_connection
+from datamind_console.i18n import t
+from datamind_console.ui.components.states import error_state
 from hades.enforcers import re_entry_swap_service as swap_svc
 
 
@@ -38,15 +45,74 @@ _V1_STOP_COLOR = [90, 90, 90, 200]
 _V2_STOP_COLOR = [255, 180, 0, 220]
 
 
+_LOG = logging.getLogger(__name__)
+_FLASH_KEY = "re_entry.flash"
+
+
+def _flash(message: str) -> None:
+    """Keep a success message across the st.rerun() that follows an action.
+
+    The handlers rerun right after success, so st.success() alone was never
+    visible to the operator.
+    """
+    st.session_state[_FLASH_KEY] = message
+
+
+def _show_flash() -> None:
+    message = st.session_state.pop(_FLASH_KEY, None)
+    if message:
+        st.success(message, icon=":material/task_alt:")
+
+
+def _log_decision(
+    *,
+    queue_id: str,
+    decision: str,
+    operator_id: Optional[str],
+    reason_code: Optional[str] = None,
+    notes: Optional[str] = None,
+) -> None:
+    """Best-effort row in console.phase_decisions; never blocks the action.
+
+    The table (phase 1-4, APPROVE/REJECT/EDIT/PUBLISH, reason required for
+    REJECT/EDIT) was written for review screens that were later removed, so
+    it stayed empty. The swap service keeps its own audit in the queue rows;
+    this adds the cross-phase decision log that the Review page reads.
+    """
+    user_id: Optional[str] = None
+    try:
+        user_id = str(_uuid.UUID(str(operator_id))) if operator_id else None
+    except ValueError:
+        user_id = None
+    try:
+        console_repo.create_phase_decision(
+            user_id=user_id,
+            phase=3,
+            item_id=str(queue_id),
+            decision=decision,
+            reason_code=reason_code,
+            notes=(notes or None),
+        )
+    except Exception as exc:  # noqa: BLE001 - logged and surfaced, never blocks
+        _LOG.warning("re_entry.decision_log_failed queue_id=%s: %s", queue_id, exc)
+        st.caption(t("reentry.decision_log_failed"))
+
+
 def _dsn() -> str:
-    value = os.environ.get("DB_DSN") or os.environ.get("LOCAL_DB_DSN")
-    if not value:
-        raise RuntimeError("DB_DSN or LOCAL_DB_DSN must be configured before loading re-entry data.")
-    return value
+    """DSN for the HADES swap service, which runs its own atomic transaction."""
+    return active_dsn()
 
 
+@contextmanager
 def _connect():
-    return psycopg2.connect(_dsn())
+    """Short-lived READ ONLY connection for this tab's reads.
+
+    ``with psycopg2.connect(...) as conn`` (the old pattern) ends the
+    transaction but does not close the connection; this helper always
+    closes it.
+    """
+    with read_only_connection(statement_timeout_ms=30_000) as conn:
+        yield conn
 
 
 def _load_pending_re_entry_rows() -> list[dict[str, Any]]:
@@ -173,7 +239,7 @@ def _render_v1_v2_map(
     v2_stops: list[dict[str, Any]],
 ) -> None:
     if not v2_coords and not v1_coords:
-        st.info("No geometry available to render.")
+        st.info(t("ui.p3.re_entry_review.no_geometry_available_render"))
         return
 
     centre = (v2_coords or v1_coords)[len(v2_coords or v1_coords) // 2]
@@ -251,8 +317,7 @@ def _render_v1_v2_map(
         use_container_width=True,
     )
     st.caption(
-        "Legend — grey line + grey dots: v1 (current). Red line + "
-        "amber dots: v2 proposal."
+        t("ui.p3.re_entry_review.legend_grey_line_grey_dots_v1")
     )
 
 
@@ -279,17 +344,18 @@ def _summary_table(row: dict[str, Any]) -> pd.DataFrame:
 # taxonomy + the migration 034 CHECK constraint).
 # ---------------------------------------------------------------------------
 
+# Keys are ids; labels come from the catalog at render time (reentry.bucket.<id>).
 _BUCKETS = {
-    "Ready to Ship": ("good", "acceptable", "ship_pending_dr"),
-    "Review First":  ("degraded_minor",),
-    "Needs Work":    ("degraded",),
-    "Cannot Fix":    ("unroutable",),
+    "ready_to_ship": ("good", "acceptable", "ship_pending_dr"),
+    "review_first":  ("degraded_minor",),
+    "needs_work":    ("degraded",),
+    "cannot_fix":    ("unroutable",),
 }
 _BUCKET_BADGE = {
-    "Ready to Ship": "🟢",
-    "Review First":  "🟡",
-    "Needs Work":    "🟠",
-    "Cannot Fix":    "🔴",
+    "ready_to_ship": "🟢",
+    "review_first":  "🟡",
+    "needs_work":    "🟠",
+    "cannot_fix":    "🔴",
 }
 
 
@@ -311,8 +377,7 @@ def _render_bucket_header(rows: list[dict[str, Any]]) -> None:
         bucket_counts[name] = sum(by_class.get(c, 0) for c in classes)
 
     st.markdown(
-        f"**{len(rows)} pending** · last reclassified "
-        f"`{last_classified or '(never)'}`"
+        t("ui.p3.re_entry_review.n_rows_pending_last_reclassified_last", n_rows=(len(rows)), last_classified=(last_classified or '(never)'))
     )
     cols = st.columns(len(_BUCKETS))
     for i, (name, classes) in enumerate(_BUCKETS.items()):
@@ -320,7 +385,7 @@ def _render_bucket_header(rows: list[dict[str, Any]]) -> None:
             f"{c}: {by_class.get(c, 0)}" for c in classes
         )
         cols[i].metric(
-            f"{_BUCKET_BADGE[name]} {name}",
+            f"{_BUCKET_BADGE[name]} {t(f'reentry.bucket.{name}')}",
             bucket_counts[name],
             delta=breakdown,
             delta_color="off",
@@ -333,7 +398,7 @@ def _render_bucket_header(rows: list[dict[str, Any]]) -> None:
             blocking[b] = blocking.get(b, 0) + 1
     if blocking:
         with st.expander(
-            f"🚧 DR Batches blocking shipments — {len(blocking)} batch(es)",
+            t("ui.p3.re_entry_review.dr_batches_blocking_shipments_n_blocking", n_blocking=(len(blocking))),
             expanded=False,
         ):
             df = pd.DataFrame(
@@ -442,7 +507,7 @@ def _render_preship_cleanup_audit_panel() -> None:
     try:
         all_rows = _load_preship_cleanup_audit_rows()
     except Exception as exc:
-        st.error(f"Could not load cleanup audit: {exc}")
+        st.error(t("ui.p3.re_entry_review.could_not_load_cleanup_audit_exc", exc=(exc)))
         return
 
     eligible_pending = 0
@@ -481,39 +546,21 @@ def _render_preship_cleanup_audit_panel() -> None:
         if int((r.get("_report") or {}).get("cleanup_version", 0)) == 2
     )
 
-    st.markdown("##### Pre-ship orphan cleanup — cohort audit")
-    with st.expander("How to read this panel", expanded=False):
+    st.markdown(t("ui.p3.re_entry_review.pre_ship_orphan_cleanup_cohort_audit"))
+    with st.expander(t("ui.p3.re_entry_review.how_read_this_panel"), expanded=False):
         st.markdown(
-            "Pre-ship cleanup removes or snaps stops that drift off "
-            "the route polyline before a v2 ships. Three outcomes:\n\n"
-            "- **Applied**: cleanup landed on the row. `proposed_stops` "
-            "now has snapped + aligned stops only; orphans (>60 m off "
-            "polyline) are gone.\n"
-            "- **Rejected (safety gate)**: cleanup would have removed "
-            ">20 % of stops, so it was blocked. `proposed_stops` "
-            "is unchanged, but the report records what the cleanup "
-            "*would* have done. These rows usually need a polyline "
-            "rebuild, not a threshold tweak.\n"
-            "- **Eligible, not yet run**: pending row in a shippable "
-            "class with no DR blockers. Backfill will pick these up.\n\n"
-            "**Per-row table columns:** `before/after` = stops count, "
-            "`snapped` = stops moved onto polyline, `removed` = "
-            "orphans dropped, `removal_%` = removed/before. v=cleanup "
-            "schema version (2 = current 3-category design).\n\n"
-            "**Inspector below** shows the chosen row's BEFORE / "
-            "AFTER map so you can see exactly what changed."
+            t("ui.p3.re_entry_review.pre_ship_cleanup_removes_snaps_stops")
         )
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Applied", len(applied_rows), help=f"{v2_applied} at v2")
-    c2.metric("Rejected (safety gate)", len(rejected_rows))
-    c3.metric("Eligible, not yet run", eligible_pending)
-    c4.metric("Stops snapped (applied total)", total_snapped)
+    c1.metric(t("ui.p3.re_entry_review.applied"), len(applied_rows), help=f"{v2_applied} at v2")
+    c2.metric(t("ui.p3.re_entry_review.rejected_safety_gate"), len(rejected_rows))
+    c3.metric(t("ui.p3.re_entry_review.eligible_not_yet_run"), eligible_pending)
+    c4.metric(t("ui.p3.re_entry_review.stops_snapped_applied_total"), total_snapped)
 
     sub1, sub2 = st.columns(2)
-    sub1.caption(f"Stops removed across applied rows: **{total_removed}**")
+    sub1.caption(t("ui.p3.re_entry_review.stops_removed_across_applied_rows_total", total_removed=(total_removed)))
     sub2.caption(
-        f"Stops blocked from removal by safety gate (rejected rows): "
-        f"**{total_blocked_removals}**"
+        t("ui.p3.re_entry_review.stops_blocked_from_removal_by_safety", total_blocked_removals=(total_blocked_removals))
     )
 
     if rows:
@@ -587,40 +634,29 @@ def _render_refill_audit_panel() -> None:
     try:
         m = _load_refill_audit_summary()
     except Exception as exc:
-        st.caption(f"Could not load refill audit metrics: {exc}")
+        st.caption(t("ui.p3.re_entry_review.could_not_load_refill_audit_metrics", exc=(exc)))
         return
 
     if m["applied"] == 0 and m["total_decisions"] == 0 and m["eligible_pending"] == 0:
         return
 
-    st.markdown("##### γ — Stop Refill cohort metrics")
-    with st.expander("How to read this panel", expanded=False):
+    st.markdown(t("ui.p3.re_entry_review.stop_refill_cohort_metrics"))
+    with st.expander(t("ui.p3.re_entry_review.how_read_this_panel"), expanded=False):
         st.markdown(
-            "Stop Refill (γ) is the inverse complement to cleanup: it "
-            "ADDS stops the polyline visits but `proposed_stops` omits, "
-            "sourced from production routes via geometric matching.\n\n"
-            "- **Routes with refill**: rows where `refill_applied=TRUE` "
-            "(at least one accepted candidate landed on the row).\n"
-            "- **Eligible for refill**: pending + shippable rows that "
-            "have not yet run GREEK pipeline.\n"
-            "- **Total decisions / Accepted / Skipped / Reviewed later**: "
-            "per-candidate operator outcomes from `refill_audit`. "
-            "Acceptance rate = accepted / total."
+            t("ui.p3.re_entry_review.stop_refill_inverse_complement_cleanup_it")
         )
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Routes with refill", m["applied"])
-    c2.metric("Eligible for refill", m["eligible_pending"])
-    c3.metric("Total decisions", m["total_decisions"])
-    c4.metric("Accepted", m["accepted"])
-    c5.metric("Skipped", m["skipped"])
+    c1.metric(t("ui.p3.re_entry_review.routes_refill"), m["applied"])
+    c2.metric(t("ui.p3.re_entry_review.eligible_refill"), m["eligible_pending"])
+    c3.metric(t("ui.p3.re_entry_review.total_decisions"), m["total_decisions"])
+    c4.metric(t("ui.p3.re_entry_review.accepted"), m["accepted"])
+    c5.metric(t("ui.p3.re_entry_review.skipped"), m["skipped"])
 
     if m["total_decisions"] > 0:
         accept_rate = m["accepted"] / m["total_decisions"] * 100.0
         st.caption(
-            f"Acceptance rate: **{accept_rate:.1f}%** "
-            f"({m['accepted']}/{m['total_decisions']})  ·  "
-            f"Reviewed later: {m['reviewed_later']}"
+            t("ui.p3.re_entry_review.acceptance_rate_accept_rate_accepted_total", accept_rate=format((accept_rate), '.1f'), accepted=(m['accepted']), total_decisions=(m['total_decisions']), reviewed_later=(m['reviewed_later']))
         )
 
 
@@ -786,10 +822,10 @@ def _render_inspector_map(
     centre: tuple[float, float],
 ) -> None:
     """Render a single pydeck map with polyline + role-coloured stops."""
-    st.markdown(f"**{title}** — {len(stops)} stops")
+    st.markdown(t("ui.p3.re_entry_review.title_n_stops_stops", title=(title), n_stops=(len(stops))))
 
     if not coords and not stops:
-        st.info("No geometry or stops to render.")
+        st.info(t("ui.p3.re_entry_review.no_geometry_stops_render"))
         return
 
     layers = []
@@ -853,7 +889,7 @@ def _render_preship_cleanup_inspector(
     if not rows:
         return
 
-    st.markdown("##### Inspector — before vs. after cleanup")
+    st.markdown(t("ui.p3.re_entry_review.inspector_before_vs_after_cleanup"))
 
     # Selectbox keyed by queue_id; show outcome + route + counts so
     # the operator can pick a meaningful row to scrutinise.
@@ -873,7 +909,7 @@ def _render_preship_cleanup_inspector(
 
     queue_ids = [str(r.get("queue_id")) for r in rows]
     selected = st.selectbox(
-        "Inspect a cleanup-touched row",
+        t("ui.p3.re_entry_review.inspect_cleanup_touched_row"),
         options=queue_ids,
         format_func=lambda qid: next(
             (_label(r) for r in rows if str(r.get("queue_id")) == qid), qid
@@ -887,12 +923,12 @@ def _render_preship_cleanup_inspector(
 
     payload = _load_inspector_payload(selected)
     if payload is None:
-        st.warning("Row not found in approval_queue.")
+        st.warning(t("ui.p3.re_entry_review.row_not_found_approval_queue"))
         return
 
     coords = _coords_from_linestring(payload.get("proposed_shape"))
     if not coords:
-        st.warning("Proposed polyline is empty — nothing to draw.")
+        st.warning(t("ui.p3.re_entry_review.proposed_polyline_empty_nothing_draw"))
         return
 
     report = chosen.get("_report") or {}
@@ -909,26 +945,26 @@ def _render_preship_cleanup_inspector(
     n_orphan = sum(1 for s in before_stops if s["role"] == "orphan")
 
     st.caption(
-        f"🟢 **aligned** ({n_aligned_before}, ≤10 m): unchanged · "
-        f"🟡 **snapped** ({n_snapped}, 10–60 m): moved onto polyline · "
-        f"🔴 **orphan** ({n_orphan}, >60 m): "
-        + ("removed" if applied else "would be removed (blocked by safety gate)")
-        + " · 🔵 polyline = canonical."
+        t(
+            "reentry.inspector.legend",
+            aligned=n_aligned_before, snapped=n_snapped, orphan=n_orphan,
+            orphan_fate=t("reentry.inspector.removed") if applied else t("reentry.inspector.would_be_removed"),
+        )
     )
 
     left, right = st.columns(2, gap="medium")
     with left:
         _render_inspector_map(
-            title="BEFORE — every stop at its original position",
+            title=t("reentry.inspector.before_original"),
             coords=coords,
             stops=before_stops,
             centre=centre,
         )
     with right:
         title = (
-            "AFTER — applied (orphans gone, snaps moved)"
+            t("reentry.inspector.after_applied")
             if applied
-            else "AFTER (counterfactual) — what cleanup *would* produce"
+            else t("reentry.inspector.after_counterfactual")
         )
         _render_inspector_map(
             title=title,
@@ -940,12 +976,7 @@ def _render_preship_cleanup_inspector(
     if not applied:
         reason = report.get("validate_reason") or "unknown"
         st.warning(
-            f"Safety gate fired: {reason}. The AFTER map is a "
-            "counterfactual — `proposed_stops` was NOT modified. "
-            "Look at the red dots in BEFORE: that is the cluster of "
-            "stops that drifted >60 m from the polyline. A high "
-            "removal % usually means the polyline itself is wrong "
-            "(corridor shifted), not that the threshold is too tight."
+            t("ui.p3.re_entry_review.safety_gate_fired_reason_after_map", reason=(reason))
         )
 
 
@@ -968,25 +999,23 @@ def _render_preship_cleanup_panel(row: dict[str, Any]) -> None:
 
     if applied and report:
         st.divider()
-        st.markdown("##### Pre-ship orphan cleanup applied")
+        st.markdown(t("ui.p3.re_entry_review.pre_ship_orphan_cleanup_applied"))
         col1, col2, col3 = st.columns(3)
         before = int(report.get("total_stops_before", 0))
         after = int(report.get("total_stops_after", 0))
-        col1.metric("Stops before", before)
-        col2.metric("Stops after", after)
-        col3.metric("Net change", after - before)
+        col1.metric(t("ui.p3.re_entry_review.stops_before"), before)
+        col2.metric(t("ui.p3.re_entry_review.stops_after"), after)
+        col3.metric(t("ui.p3.re_entry_review.net_change"), after - before)
 
         applied_at = row.get("pre_ship_cleanup_at")
         if applied_at is not None:
             st.caption(
-                f"Applied at {applied_at}; cleanup_version="
-                f"{report.get('cleanup_version', '?')}; thresholds="
-                f"{report.get('thresholds_used', {})}"
+                t("ui.p3.re_entry_review.applied_at_applied_at_cleanup_version", applied_at=(applied_at), cleanup_version=(report.get('cleanup_version', '?')), thresholds_used=(report.get('thresholds_used', {})))
             )
 
         orphans = report.get("orphans_removed") or []
         if orphans:
-            st.markdown("**Orphans removed (too far from polyline)**")
+            st.markdown(t("ui.p3.re_entry_review.orphans_removed_too_far_from_polyline"))
             st.dataframe(
                 pd.DataFrame(orphans),
                 use_container_width=True,
@@ -999,7 +1028,7 @@ def _render_preship_cleanup_panel(row: dict[str, Any]) -> None:
             or []
         )
         if snapped:
-            st.markdown("**Snapped to polyline**")
+            st.markdown(t("ui.p3.re_entry_review.snapped_polyline"))
             st.dataframe(
                 pd.DataFrame(snapped),
                 use_container_width=True,
@@ -1008,17 +1037,14 @@ def _render_preship_cleanup_panel(row: dict[str, Any]) -> None:
 
         if not report.get("validate_ok", True):
             st.warning(
-                "Safety gate triggered during the swap: "
-                f"{report.get('validate_reason', 'unknown')}."
+                t("ui.p3.re_entry_review.safety_gate_triggered_during_swap_validate", validate_reason=(report.get('validate_reason', 'unknown')))
             )
         return
 
     if cls in _SHIPPABLE_CLASSES_FOR_CLEANUP and not applied:
         st.divider()
         st.caption(
-            "Pre-ship orphan cleanup will run automatically when you "
-            "click APPROVE — the swap service shows a BEFORE/AFTER "
-            "preview before anything commits."
+            t("ui.p3.re_entry_review.pre_ship_orphan_cleanup_will_run")
         )
 
 
@@ -1030,25 +1056,21 @@ def _render_dr_dependency_panel(row: dict[str, Any]) -> None:
     if cls not in ("ship_pending_dr", "degraded_minor") or not pending:
         return
     st.divider()
-    st.markdown("##### 🚧 DR dependencies")
+    st.markdown(t("ui.p3.re_entry_review.dr_dependencies"))
     n = int(row.get("tier4_pending_count") or 0)
     st.markdown(
-        f"This route is waiting on **{len(pending)}** DR batch(es) "
-        f"to resolve **{n}** tier-4 gap(s)."
+        t("ui.p3.re_entry_review.this_route_waiting_n_pending_dr", n_pending=(len(pending)), n=(n))
     )
     for b in pending:
         if b.startswith("batch_"):
             link = f"workspace/dr_stop_coverage/queries/{b}.md"
-            note = "(existing batch — process if not yet sent)"
+            note = t("reentry.dr.existing_batch")
         else:
             link = f"workspace/dr_stop_coverage/pending_requests/{b}.md"
-            note = "(on-demand request — paste into Claude.ai with web search)"
+            note = t("reentry.dr.on_demand")
         st.markdown(f"- `{b}` → `{link}`  {note}")
     st.caption(
-        "Approving now ships the v2 with current resolutions (Tier 1/2 + "
-        "synthetic fallback for unresolved gaps). When the DR batch lands, "
-        "the reclassifier upgrades the row automatically — but if the row "
-        "is already approved, no further reclassification happens."
+        t("ui.p3.re_entry_review.approving_now_ships_v2_current_resolutions")
     )
 
 
@@ -1069,27 +1091,24 @@ def _render_swap_preview_block(
     that calls ``confirm_swap_with_cleanup`` atomically.
     """
     st.divider()
-    st.markdown("##### Swap preview")
+    st.markdown(t("ui.p3.re_entry_review.swap_preview"))
 
     if preview.swap_blockers:
         st.error(
-            "This route cannot be swapped: "
-            + "; ".join(preview.swap_blockers)
+            t("reentry.cannot_swap", blockers="; ".join(preview.swap_blockers))
         )
-        if st.button("Dismiss preview", key=f"{preview_key}.dismiss_blocked"):
+        if st.button(t("ui.p3.re_entry_review.dismiss_preview"), key=f"{preview_key}.dismiss_blocked"):
             del st.session_state[preview_key]
             st.rerun()
         return
 
     if not preview.cleanup_eligible:
         st.info(
-            "Cleanup will be skipped for this swap — "
-            f"{preview.cleanup_skip_reason}. "
-            "The swap can still proceed with the current proposed_stops."
+            t("ui.p3.re_entry_review.cleanup_will_be_skipped_this_swap", cleanup_skip_reason=(preview.cleanup_skip_reason))
         )
         c_ok, c_cancel = st.columns(2)
         if c_ok.button(
-            "✅ Confirm and ship (no cleanup)",
+            t("ui.p3.re_entry_review.confirm_ship_no_cleanup"),
             key=f"{preview_key}.confirm_no_cleanup",
             type="primary",
             use_container_width=True,
@@ -1104,7 +1123,7 @@ def _render_swap_preview_block(
                 expected_fingerprint=preview.state_fingerprint,
             )
         if c_cancel.button(
-            "Cancel",
+            t("ui.p3.re_entry_review.cancel"),
             key=f"{preview_key}.cancel_no_cleanup",
             use_container_width=True,
         ):
@@ -1133,14 +1152,14 @@ def _render_swap_preview_block(
         col_b, col_a = st.columns(2, gap="medium")
         with col_b:
             _render_inspector_map(
-                title="BEFORE — current stops",
+                title=t("reentry.inspector.before_current"),
                 coords=coords,
                 stops=before_stops,
                 centre=centre,
             )
         with col_a:
             _render_inspector_map(
-                title="AFTER — what cleanup will produce",
+                title=t("reentry.inspector.after_will_produce"),
                 coords=coords,
                 stops=after_stops,
                 centre=centre,
@@ -1150,15 +1169,13 @@ def _render_swap_preview_block(
     n_snap = int(report.get("stops_snapped", 0))
     n_remove = int(report.get("stops_removed", 0))
     st.markdown(
-        f"**Cleanup will:** snap **{n_snap}** stops onto polyline · "
-        f"remove **{n_remove}** orphan(s) · "
-        f"keep **{n_aligned}** aligned stop(s) as-is."
+        t("ui.p3.re_entry_review.cleanup_will_snap_n_snap_stops", n_snap=(n_snap), n_remove=(n_remove), n_aligned=(n_aligned))
     )
 
     if preview.safety_gate_status == "pass":
         c_ok, c_cancel = st.columns(2)
         if c_ok.button(
-            "✅ Confirm and ship",
+            t("ui.p3.re_entry_review.confirm_ship"),
             key=f"{preview_key}.confirm",
             type="primary",
             use_container_width=True,
@@ -1173,7 +1190,7 @@ def _render_swap_preview_block(
                 expected_fingerprint=preview.state_fingerprint,
             )
         if c_cancel.button(
-            "Cancel",
+            t("ui.p3.re_entry_review.cancel"),
             key=f"{preview_key}.cancel",
             use_container_width=True,
         ):
@@ -1183,30 +1200,24 @@ def _render_swap_preview_block(
 
     # Safety gate would reject the cleanup.
     st.warning(
-        f"⚠️ Safety gate would reject this cleanup: "
-        f"{preview.safety_gate_reason}. This usually means corridor-shift "
-        "(the polyline does not match where the stops actually are). "
-        "Consider rebuilding the polyline instead of overriding."
+        t("ui.p3.re_entry_review.safety_gate_would_reject_this_cleanup", safety_gate_reason=(preview.safety_gate_reason))
     )
-    with st.expander("Override and ship anyway (advanced)"):
+    with st.expander(t("ui.p3.re_entry_review.override_ship_anyway_advanced")):
         override_reason = st.text_area(
-            "Reason for override (required, will be logged to "
-            "route_prod.cleanup_override_audit):",
+            t("ui.p3.re_entry_review.reason_override_required_will_be_logged"),
             key=f"{preview_key}.override_reason",
             placeholder=(
-                "e.g. 'Visual inspection confirms orphans are real bus "
-                "stops on a side-road; polyline is correct.' "
-                "Min 20 characters."
+                t("ui.p3.re_entry_review.e_g_visual_inspection_confirms_orphans")
             ),
         )
         ovr_col1, ovr_col2 = st.columns(2)
         if ovr_col1.button(
-            "⚠️ Override & ship",
+            t("ui.p3.re_entry_review.override_ship"),
             key=f"{preview_key}.override_confirm",
             use_container_width=True,
         ):
             if len((override_reason or "").strip()) < 20:
-                st.error("Reason must be at least 20 characters.")
+                st.error(t("ui.p3.re_entry_review.reason_must_be_at_least_20"))
             else:
                 _execute_confirm(
                     queue_id=queue_id,
@@ -1218,7 +1229,7 @@ def _render_swap_preview_block(
                     expected_fingerprint=preview.state_fingerprint,
                 )
         if ovr_col2.button(
-            "Cancel",
+            t("ui.p3.re_entry_review.cancel"),
             key=f"{preview_key}.override_cancel",
             use_container_width=True,
         ):
@@ -1247,24 +1258,26 @@ def _execute_confirm(
             operator_override=operator_override,
             override_reason=override_reason,
         )
-        msg = (
-            f"Swap applied — v{result.version_before} → "
-            f"v{result.version_after}. Fix report: "
-            f"{result.fix_report_id}. "
-            f"Synthetic stops created: "
-            f"{len(result.created_synthetic_node_ids)}."
+        msg = t(
+            "reentry.swap_applied",
+            before=result.version_before, after=result.version_after,
+            report=result.fix_report_id, n_synthetic=len(result.created_synthetic_node_ids),
         )
         if result.cleanup_applied:
-            msg += " Cleanup applied"
-            if result.override_used:
-                msg += " (with operator override)"
-            msg += "."
-        st.success(msg)
+            msg += " " + (t("reentry.cleanup_applied_override") if result.override_used else t("reentry.cleanup_applied"))
+        _flash(msg)
+        _log_decision(
+            queue_id=queue_id,
+            decision="APPROVE",
+            operator_id=operator_id,
+            reason_code="operator_override" if operator_override else None,
+            notes=(override_reason or f"re-entry swap v{result.version_before} -> v{result.version_after}"),
+        )
     except swap_svc.SwapError as exc:
-        st.error(f"Swap rejected by business rule: {exc}")
+        st.error(t("ui.p3.re_entry_review.swap_rejected_by_business_rule_exc", exc=(exc)))
         return
-    except Exception as exc:
-        st.exception(exc)
+    except Exception as exc:  # noqa: BLE001 - rendered and logged
+        error_state(exc, context_key="reentry.action_failed", retry=False)
         return
     if preview_key in st.session_state:
         del st.session_state[preview_key]
@@ -1275,12 +1288,8 @@ def _execute_confirm(
 # GREEK pipeline preview block (β → α → γ → δ).
 # ---------------------------------------------------------------------------
 
-_DECISION_LABEL_TO_VALUE = {
-    "Accept": "accepted",
-    "Skip": "skipped",
-    "Review later": "reviewed_later",
-}
-_DECISION_VALUE_TO_LABEL = {v: k for k, v in _DECISION_LABEL_TO_VALUE.items()}
+# Refill decision values; labels come from the catalog (reentry.refill_decision.<value>).
+_REFILL_DECISIONS = ("accepted", "skipped", "reviewed_later")
 
 
 def _render_refill_candidates_section(
@@ -1295,13 +1304,9 @@ def _render_refill_candidates_section(
     if not candidates:
         return 0
 
-    st.markdown("### γ — Refill candidates from production routes")
+    st.markdown(t("ui.p3.re_entry_review.refill_candidates_from_production_routes"))
     st.caption(
-        f"Found **{len(candidates)}** candidate(s) "
-        f"({preview.refill_high_confidence_count} high confidence, "
-        f"{preview.refill_medium_confidence_count} medium). "
-        "Review EACH candidate individually before confirming. "
-        "No bulk accept; per-candidate decision only."
+        t("ui.p3.re_entry_review.found_n_candidates_candidate_s_refill", n_candidates=(len(candidates)), refill_high_confidence_count=(preview.refill_high_confidence_count), refill_medium_confidence_count=(preview.refill_medium_confidence_count))
     )
 
     decisions = dict(st.session_state.get(decisions_key, {}))
@@ -1316,50 +1321,43 @@ def _render_refill_candidates_section(
             band = cand.get("confidence_band") or "medium"
             band_emoji = "🟢" if band == "high" else "🟡"
             st.markdown(
-                f"**{band_emoji} Candidate {i + 1}** — "
-                f"score: **{float(cand.get('score') or 0.0):.2f}**"
+                t("ui.p3.re_entry_review.band_emoji_candidate_i_score_score", band_emoji=(band_emoji), i=(i + 1), score=format((float(cand.get('score') or 0.0)), '.2f'))
             )
             mcols = st.columns(5)
             mcols[0].metric(
-                "Dist to A",
+                t("ui.p3.re_entry_review.dist"),
                 f"{float(cand.get('distance_to_polyline_m') or 0.0):.1f} m",
             )
             mcols[1].metric(
-                "Origin align",
+                t("ui.p3.re_entry_review.origin_align"),
                 f"{float(cand.get('origin_distance_m') or 0.0):.1f} m",
-                help="Distance to source-route polyline. Spec: stop must "
-                     "be ≤10 m on its origin to qualify.",
+                help=t("ui.p3.re_entry_review.distance_source_route_polyline_spec_stop"),
             )
-            mcols[2].metric("Popularity", int(cand.get("popularity") or 0))
+            mcols[2].metric(t("ui.p3.re_entry_review.popularity"), int(cand.get("popularity") or 0))
             mcols[3].metric(
-                "Max segment",
+                t("ui.p3.re_entry_review.max_segment"),
                 f"{float(cand.get('max_shared_segment_m') or 0.0):.0f} m",
             )
             n_sources = len(cand.get("source_route_ids") or [])
-            mcols[4].caption(f"Sources: {n_sources} route(s)")
+            mcols[4].caption(t("ui.p3.re_entry_review.sources_n_sources_route_s", n_sources=(n_sources)))
             st.caption(
-                f"Stop id: `{stop_id}` · "
-                f"({float(cand.get('lat') or 0.0):.5f}, "
-                f"{float(cand.get('lon') or 0.0):.5f})"
+                t("ui.p3.re_entry_review.stop_id_stop_id_lat_lon", stop_id=(stop_id), lat=format((float(cand.get('lat') or 0.0)), '.5f'), lon=format((float(cand.get('lon') or 0.0)), '.5f'))
             )
 
         with col_decision:
             current = decisions.get(stop_id)
-            current_label = _DECISION_VALUE_TO_LABEL.get(current)
-            options = list(_DECISION_LABEL_TO_VALUE.keys())
-            try:
-                idx = options.index(current_label) if current_label else None
-            except ValueError:
-                idx = None
+            options = list(_REFILL_DECISIONS)
+            idx = options.index(current) if current in options else None
             choice = st.radio(
-                f"Decision for candidate {i + 1}",
+                t("ui.p3.re_entry_review.decision_candidate_i", i=(i + 1)),
                 options=options,
                 index=idx,
+                format_func=lambda v: t(f"reentry.refill_decision.{v}"),
                 key=f"p3.re_entry.greek.decision.{queue_id}.{stop_id}",
                 horizontal=False,
             )
             if choice is not None:
-                decisions[stop_id] = _DECISION_LABEL_TO_VALUE[choice]
+                decisions[stop_id] = choice
                 st.session_state[decisions_key] = decisions
 
         st.divider()
@@ -1368,8 +1366,7 @@ def _render_refill_candidates_section(
     total = len(candidates)
     if decided < total:
         st.warning(
-            f"⚠️ {decided}/{total} candidates reviewed. All candidates must "
-            "have a decision before the Confirm button enables."
+            t("ui.p3.re_entry_review.decided_total_candidates_reviewed_all_candidates", decided=(decided), total=(total))
         )
     return decided
 
@@ -1398,28 +1395,34 @@ def _execute_greek_confirm(
             operator_override=operator_override,
             override_reason=override_reason,
         )
-    except Exception as exc:
-        st.exception(exc)
+    except Exception as exc:  # noqa: BLE001 - rendered and logged
+        error_state(exc, context_key="reentry.action_failed", retry=False)
         return
 
     if result.success:
-        msg_parts = [f"Shipped! Fix report: {result.swap_id}."]
+        msg_parts = [t("reentry.shipped", report=result.swap_id)]
         if result.cleanup_applied:
-            msg_parts.append("Cleanup applied.")
+            msg_parts.append(t("reentry.cleanup_applied_sentence"))
         if result.refill_decisions_count:
             msg_parts.append(
-                f"Refill: {result.refill_accepted_count} accepted of "
-                f"{result.refill_decisions_count} candidates."
+                t("reentry.refill_summary", accepted=result.refill_accepted_count, total=result.refill_decisions_count)
             )
         if result.override_used:
-            msg_parts.append("Operator override used.")
-        st.success(" ".join(msg_parts))
+            msg_parts.append(t("reentry.override_used"))
+        _flash(" ".join(msg_parts))
+        _log_decision(
+            queue_id=queue_id,
+            decision="APPROVE",
+            operator_id=operator_id,
+            reason_code="operator_override" if operator_override else None,
+            notes=(override_reason or f"GREEK ship {result.swap_id}"),
+        )
         for k in (preview_key, decisions_key):
             if k in st.session_state:
                 del st.session_state[k]
         st.rerun()
     else:
-        st.error(f"GREEK pipeline rejected: {result.error}")
+        st.error(t("ui.p3.re_entry_review.greek_pipeline_rejected_error", error=(result.error)))
 
 
 def _render_greek_preview_block(
@@ -1443,10 +1446,10 @@ def _render_greek_preview_block(
 
     if preview.blockers:
         st.error(
-            "Cannot ship this route: " + "; ".join(preview.blockers)
+            t("reentry.cannot_ship", blockers="; ".join(preview.blockers))
         )
         if st.button(
-            "Dismiss preview", key=f"{preview_key}.dismiss_blocked"
+            t("ui.p3.re_entry_review.dismiss_preview"), key=f"{preview_key}.dismiss_blocked"
         ):
             for k in (preview_key, decisions_key):
                 if k in st.session_state:
@@ -1456,11 +1459,9 @@ def _render_greek_preview_block(
 
     if not preview.cleanup_eligible:
         st.info(
-            "Cleanup will be skipped for this swap — "
-            f"{preview.cleanup_skip_reason}. "
-            "GREEK pipeline requires a shippable, DR-clean row."
+            t("ui.p3.re_entry_review.cleanup_will_be_skipped_this_swap_2", cleanup_skip_reason=(preview.cleanup_skip_reason))
         )
-        if st.button("Dismiss preview", key=f"{preview_key}.dismiss_skip"):
+        if st.button(t("ui.p3.re_entry_review.dismiss_preview"), key=f"{preview_key}.dismiss_skip"):
             for k in (preview_key, decisions_key):
                 if k in st.session_state:
                     del st.session_state[k]
@@ -1468,7 +1469,7 @@ def _render_greek_preview_block(
         return
 
     # ----- Section 1 — α cleanup BEFORE/AFTER maps -----
-    st.markdown("### α — Cleanup preview")
+    st.markdown(t("ui.p3.re_entry_review.cleanup_preview"))
     report = preview.cleanup_report or {}
     proposed_stops_raw = row.get("proposed_stops") or []
     if isinstance(proposed_stops_raw, str):
@@ -1489,12 +1490,12 @@ def _render_greek_preview_block(
         cb, ca = st.columns(2, gap="medium")
         with cb:
             _render_inspector_map(
-                title="BEFORE — current stops",
+                title=t("reentry.inspector.before_current"),
                 coords=coords, stops=before_stops, centre=centre,
             )
         with ca:
             _render_inspector_map(
-                title="AFTER cleanup",
+                title=t("reentry.inspector.after_cleanup"),
                 coords=coords, stops=after_stops, centre=centre,
             )
 
@@ -1502,9 +1503,7 @@ def _render_greek_preview_block(
     n_snap = int(report.get("stops_snapped", 0))
     n_remove = int(report.get("stops_removed", 0))
     st.markdown(
-        f"**Cleanup will:** snap **{n_snap}** stops onto polyline · "
-        f"remove **{n_remove}** orphan(s) · "
-        f"keep **{n_aligned}** aligned stop(s) as-is."
+        t("ui.p3.re_entry_review.cleanup_will_snap_n_snap_stops", n_snap=(n_snap), n_remove=(n_remove), n_aligned=(n_aligned))
     )
 
     # ----- Section 2 — γ refill candidates -----
@@ -1527,11 +1526,11 @@ def _render_greek_preview_block(
     if preview.cleanup_safety_gate == "pass":
         col_ok, col_cancel = st.columns(2)
         confirm_help = (
-            "All refill candidates must be reviewed before Confirm enables"
+            t("reentry.refill_review_required")
             if not decisions_complete else None
         )
         if col_ok.button(
-            "✅ Confirm and ship (GREEK pipeline)",
+            t("ui.p3.re_entry_review.confirm_ship_greek_pipeline"),
             key=f"{preview_key}.confirm_greek",
             type="primary",
             disabled=not decisions_complete,
@@ -1550,7 +1549,7 @@ def _render_greek_preview_block(
                 decisions_key=decisions_key,
             )
         if col_cancel.button(
-            "Cancel",
+            t("ui.p3.re_entry_review.cancel"),
             key=f"{preview_key}.cancel_greek",
             use_container_width=True,
         ):
@@ -1562,34 +1561,29 @@ def _render_greek_preview_block(
 
     # Safety-gate reject path.
     st.warning(
-        f"⚠️ Cleanup safety gate would reject: "
-        f"{preview.cleanup_safety_reason}. This usually means corridor-shift "
-        "(the polyline does not match where the stops actually are). "
-        "Consider rebuilding the polyline instead of overriding."
+        t("ui.p3.re_entry_review.cleanup_safety_gate_would_reject_cleanup", cleanup_safety_reason=(preview.cleanup_safety_reason))
     )
-    with st.expander("Override and ship anyway (advanced)"):
+    with st.expander(t("ui.p3.re_entry_review.override_ship_anyway_advanced")):
         override_reason = st.text_area(
-            "Reason for override (required, will be logged to "
-            "route_prod.cleanup_override_audit). Min 20 characters:",
+            t("ui.p3.re_entry_review.reason_override_required_will_be_logged_2"),
             key=f"{preview_key}.override_reason_greek",
             placeholder=(
-                "e.g. 'Visual inspection confirms orphans are real bus stops "
-                "on a side-road; polyline is correct.'"
+                t("ui.p3.re_entry_review.e_g_visual_inspection_confirms_orphans_2")
             ),
         )
         ovr1, ovr2 = st.columns(2)
         if ovr1.button(
-            "⚠️ Override & ship (GREEK pipeline)",
+            t("ui.p3.re_entry_review.override_ship_greek_pipeline"),
             key=f"{preview_key}.override_greek_confirm",
             disabled=not decisions_complete,
             help=(
                 None if decisions_complete
-                else "Review all refill candidates first"
+                else t("reentry.refill_review_first")
             ),
             use_container_width=True,
         ):
             if len((override_reason or "").strip()) < 20:
-                st.error("Reason must be at least 20 characters.")
+                st.error(t("ui.p3.re_entry_review.reason_must_be_at_least_20"))
             else:
                 _execute_greek_confirm(
                     queue_id=queue_id,
@@ -1603,7 +1597,7 @@ def _render_greek_preview_block(
                     decisions_key=decisions_key,
                 )
         if ovr2.button(
-            "Cancel",
+            t("ui.p3.re_entry_review.cancel"),
             key=f"{preview_key}.override_greek_cancel",
             use_container_width=True,
         ):
@@ -1614,25 +1608,23 @@ def _render_greek_preview_block(
 
 
 def render_re_entry_review_tab(**_: Any) -> None:
-    st.markdown("### Re-Entry Review — Grandfathered Route Swaps")
+    _show_flash()
+    st.markdown(t("ui.p3.re_entry_review.re_entry_review_grandfathered_route_swaps"))
     st.caption(
-        "Queue of v2 proposals generated by the re-entry worker for "
-        "pre-gate legacy routes. Each approval lifts a row from "
-        "`legacy_grandfathered=TRUE` into a re-enforced v2."
+        t("ui.p3.re_entry_review.queue_v2_proposals_generated_by_re")
     )
 
     try:
         rows = _load_pending_re_entry_rows()
     except Exception as exc:
-        st.error(f"Could not load approval queue: {exc}")
+        st.error(t("ui.p3.re_entry_review.could_not_load_approval_queue_exc", exc=(exc)))
         return
 
     _render_preship_cleanup_audit_panel()
 
     if not rows:
         st.success(
-            "No pending re-entry proposals. Worker backlog is either empty, "
-            "all swapped, or still planning."
+            t("ui.p3.re_entry_review.no_pending_re_entry_proposals_worker")
         )
         return
 
@@ -1652,7 +1644,7 @@ def render_re_entry_review_tab(**_: Any) -> None:
         )
 
     selected = st.selectbox(
-        "Proposal",
+        t("ui.p3.re_entry_review.proposal"),
         options=queue_ids,
         format_func=lambda qid: label_map.get(qid, qid),
         key="p3.re_entry.selected_queue_id",
@@ -1665,8 +1657,7 @@ def render_re_entry_review_tab(**_: Any) -> None:
     v1 = _load_v1_route(route_id)
     if v1 is None:
         st.warning(
-            "v1 route row not found — it may have been swapped while you "
-            "were viewing the queue. Refresh to re-sync."
+            t("ui.p3.re_entry_review.v1_route_row_not_found_it")
         )
         return
 
@@ -1695,7 +1686,7 @@ def render_re_entry_review_tab(**_: Any) -> None:
         )
 
     with left:
-        st.markdown("**Proposal summary**")
+        st.markdown(t("ui.p3.re_entry_review.proposal_summary"))
         st.dataframe(
             _summary_table(row),
             use_container_width=True,
@@ -1718,39 +1709,38 @@ def render_re_entry_review_tab(**_: Any) -> None:
     operator_id, operator_username = _operator_identity()
     if not operator_id:
         st.warning(
-            "No authenticated user — sign in from the Settings tab "
-            "before approving/rejecting. You can still preview."
+            t("ui.p3.re_entry_review.no_authenticated_user_sign_from_settings")
         )
         return
 
-    st.markdown("**Action**")
+    st.markdown(t("ui.p3.re_entry_review.action"))
     a1, a2, a3 = st.columns(3)
     with a1:
         do_preview = st.button(
-            "APPROVE v2 (preview GREEK pipeline)",
+            t("ui.p3.re_entry_review.approve_v2_preview_greek_pipeline"),
             key=f"p3.re_entry.preview.{selected}",
             type="primary",
             use_container_width=True,
         )
     with a2:
         reject_reason = st.text_input(
-            "Reject reason",
+            t("ui.p3.re_entry_review.reject_reason"),
             key=f"p3.re_entry.reject_reason.{selected}",
-            placeholder="why v2 is worse than v1",
+            placeholder=t("ui.p3.re_entry_review.why_v2_worse_than_v1"),
         )
         do_reject = st.button(
-            "REJECT v2 → queue back to pending",
+            t("ui.p3.re_entry_review.reject_v2_queue_back_pending"),
             key=f"p3.re_entry.reject.{selected}",
             use_container_width=True,
         )
     with a3:
         quarantine_reason = st.text_input(
-            "Quarantine reason",
+            t("ui.p3.re_entry_review.quarantine_reason"),
             key=f"p3.re_entry.quar_reason.{selected}",
-            placeholder="needs hand-authored fix",
+            placeholder=t("ui.p3.re_entry_review.needs_hand_authored_fix"),
         )
         do_quarantine = st.button(
-            "QUARANTINE → lock from auto-retry",
+            t("ui.p3.re_entry_review.quarantine_lock_from_auto_retry"),
             key=f"p3.re_entry.quar.{selected}",
             use_container_width=True,
         )
@@ -1765,8 +1755,8 @@ def render_re_entry_review_tab(**_: Any) -> None:
             decisions_key = f"p3.re_entry.greek.decisions.{selected}"
             if decisions_key in st.session_state:
                 del st.session_state[decisions_key]
-        except Exception as exc:
-            st.exception(exc)
+        except Exception as exc:  # noqa: BLE001 - rendered and logged
+            error_state(exc, context_key="reentry.preview_failed", retry=False)
         else:
             st.rerun()
 
@@ -1782,7 +1772,7 @@ def render_re_entry_review_tab(**_: Any) -> None:
 
     if do_reject:
         if not (reject_reason or "").strip():
-            st.error("Reject reason is required.")
+            st.error(t("ui.p3.re_entry_review.reject_reason_required"))
         else:
             try:
                 swap_svc.reject_v2(
@@ -1792,16 +1782,18 @@ def render_re_entry_review_tab(**_: Any) -> None:
                     reason=reject_reason.strip(),
                     dsn=_dsn(),
                 )
-                st.success("v2 rejected — re-entry queue reset to pending.")
+                _flash(t("reentry.flash.rejected"))
+                _log_decision(queue_id=selected, decision="REJECT", operator_id=operator_id,
+                              reason_code="reentry_reject", notes=reject_reason.strip())
                 st.rerun()
             except swap_svc.SwapError as exc:
-                st.error(f"Reject rejected by business rule: {exc}")
-            except Exception as exc:
-                st.exception(exc)
+                st.error(t("ui.p3.re_entry_review.reject_rejected_by_business_rule_exc", exc=(exc)))
+            except Exception as exc:  # noqa: BLE001 - rendered and logged
+                error_state(exc, context_key="reentry.action_failed", retry=False)
 
     if do_quarantine:
         if not (quarantine_reason or "").strip():
-            st.error("Quarantine reason is required.")
+            st.error(t("ui.p3.re_entry_review.quarantine_reason_required"))
         else:
             try:
                 swap_svc.quarantine_v2(
@@ -1811,12 +1803,11 @@ def render_re_entry_review_tab(**_: Any) -> None:
                     reason=quarantine_reason.strip(),
                     dsn=_dsn(),
                 )
-                st.success(
-                    "Route quarantined — worker will not auto-retry "
-                    "until manually unlocked."
-                )
+                _flash(t("reentry.flash.quarantined"))
+                _log_decision(queue_id=selected, decision="REJECT", operator_id=operator_id,
+                              reason_code="reentry_quarantine", notes=quarantine_reason.strip())
                 st.rerun()
             except swap_svc.SwapError as exc:
-                st.error(f"Quarantine rejected by business rule: {exc}")
-            except Exception as exc:
-                st.exception(exc)
+                st.error(t("ui.p3.re_entry_review.quarantine_rejected_by_business_rule_exc", exc=(exc)))
+            except Exception as exc:  # noqa: BLE001 - rendered and logged
+                error_state(exc, context_key="reentry.action_failed", retry=False)

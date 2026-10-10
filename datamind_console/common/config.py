@@ -92,6 +92,11 @@ def _local_only_mode_enabled() -> bool:
     return _env_bool("DATAMIND_LOCAL_ONLY_MODE", False)
 
 
+def local_only_mode_enabled() -> bool:
+    """Public accessor: True when remote database fallbacks are forbidden."""
+    return _local_only_mode_enabled()
+
+
 def _resolve_db_dsn() -> Optional[str]:
     """
     DSN resolution priority (new standard):

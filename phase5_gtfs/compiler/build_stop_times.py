@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Dict, Any, List, Tuple, Optional
 
 from phase5_gtfs.common.config import db_conn
+from phase5_gtfs.common.exportable_stops import EXPORTABLE_STOP
 from phase5_gtfs.common.time_utils import hhmmss_to_seconds, seconds_to_hhmmss
 
 
@@ -211,7 +212,7 @@ def build_stop_times(
                 # Pick the per-direction route in route_prod by (service_route_id, direction_id),
                 # falling back to (route_id) for routes whose service_route_id == route_id.
                 cur.execute(
-                    """
+                    f"""
                     SELECT n.node_id::text AS stop_id
                     FROM route_prod.routes r
                     JOIN LATERAL unnest(r.stop_node_ids) WITH ORDINALITY AS sid(node_id, seq) ON true
@@ -220,6 +221,7 @@ def build_stop_times(
                       AND r.direction_id = %s
                       AND COALESCE(r.canonical_sequence_ready, FALSE) = TRUE
                       AND r.chosen_stop_sequence_candidate_id IS NOT NULL
+                      AND {EXPORTABLE_STOP}
                     ORDER BY sid.seq
                     """,
                     (tr["route_id"], int(tr.get("direction_id") or 0)),

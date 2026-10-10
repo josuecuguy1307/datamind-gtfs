@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 import streamlit as st
 import pandas as pd
+from datamind_console.i18n import t
 
 _LOG = logging.getLogger(__name__)
 
@@ -31,14 +32,13 @@ _TRAINING_DATA_PATH = str(
 
 
 def render_stop_grounding_perf_tab(ctx=None, client=None) -> None:
-    st.subheader("Stop Grounding — Model Performance")
+    st.subheader(t("ui.p3.stop_grounding_perf.stop_grounding_model_performance"))
     st.caption(
-        "Evaluate the on-route classifier against prod routes (ground truth). "
-        "Prod routes with `stop_node_ids` + geometry provide labeled data."
+        t("ui.p3.stop_grounding_perf.evaluate_route_classifier_against_prod_routes")
     )
 
     tab_overview, tab_features, tab_routes, tab_retrain = st.tabs([
-        "Overview", "Feature Importance", "Per-Route", "Retrain",
+        t("ui.p3.stop_grounding_perf.overview"), t("ui.p3.stop_grounding_perf.feature_importance"), t("ui.p3.stop_grounding_perf.per_route"), t("ui.p3.stop_grounding_perf.retrain"),
     ])
 
     with tab_overview:
@@ -65,17 +65,17 @@ def _render_overview():
 
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Model file", "Available" if model_exists else "Not found")
+        st.metric(t("ui.p3.stop_grounding_perf.model_file"), t("sg.available") if model_exists else t("sg.not_found"))
     with col2:
-        st.metric("Training data", "Available" if data_exists else "Not found")
+        st.metric(t("ui.p3.stop_grounding_perf.training_data"), t("sg.available") if data_exists else t("sg.not_found"))
 
     if not data_exists:
-        st.warning("No training data found. Click 'Retrain' tab to build training data from prod routes.")
+        st.warning(t("ui.p3.stop_grounding_perf.no_training_data_found_click_retrain"))
         return
 
     df = _load_training_data()
     if df is None or df.empty:
-        st.warning("Training data is empty.")
+        st.warning(t("ui.p3.stop_grounding_perf.training_data_empty"))
         return
 
     # Dataset stats
@@ -84,18 +84,18 @@ def _render_overview():
     n_neg = n_total - n_pos
     n_routes = df["route_id"].nunique()
 
-    st.markdown("### Training Dataset")
+    st.markdown(t("ui.p3.stop_grounding_perf.training_dataset"))
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total samples", f"{n_total:,}")
-    c2.metric("Positive (on-route)", f"{n_pos:,}")
-    c3.metric("Negative", f"{n_neg:,}")
-    c4.metric("Routes used", n_routes)
+    c1.metric(t("ui.p3.stop_grounding_perf.total_samples"), f"{n_total:,}")
+    c2.metric(t("ui.p3.stop_grounding_perf.positive_route"), f"{n_pos:,}")
+    c3.metric(t("ui.p3.stop_grounding_perf.negative"), f"{n_neg:,}")
+    c4.metric(t("ui.p3.stop_grounding_perf.routes_used"), n_routes)
 
-    st.metric("Positive ratio", f"{n_pos / n_total * 100:.1f}%")
+    st.metric(t("ui.p3.stop_grounding_perf.positive_ratio"), f"{n_pos / n_total * 100:.1f}%")
 
     # Run evaluation if model available
-    if model_exists and st.button("Evaluate model on test split", type="primary"):
-        with st.spinner("Evaluating..."):
+    if model_exists and st.button(t("ui.p3.stop_grounding_perf.evaluate_model_test_split"), type="primary"):
+        with st.spinner(t("ui.p3.stop_grounding_perf.evaluating")):
             metrics = _evaluate_model(df)
         if metrics:
             _display_metrics(metrics)
@@ -106,7 +106,7 @@ def _render_overview():
         _display_metrics(cached)
 
     # Score distributions
-    st.markdown("### Score Distributions")
+    st.markdown(t("ui.p3.stop_grounding_perf.score_distributions"))
     _render_score_distributions(df)
 
 
@@ -115,18 +115,18 @@ def _display_metrics(metrics: Dict[str, Any]):
         st.error(metrics["error"])
         return
 
-    st.markdown("### Model Evaluation (test split)")
+    st.markdown(t("ui.p3.stop_grounding_perf.model_evaluation_test_split"))
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("AUC", f"{metrics.get('auc', 0):.4f}")
-    c2.metric("Precision", f"{metrics.get('precision', 0):.4f}")
-    c3.metric("Recall", f"{metrics.get('recall', 0):.4f}")
+    c1.metric(t("ui.p3.stop_grounding_perf.auc"), f"{metrics.get('auc', 0):.4f}")
+    c2.metric(t("ui.p3.stop_grounding_perf.precision"), f"{metrics.get('precision', 0):.4f}")
+    c3.metric(t("ui.p3.stop_grounding_perf.recall"), f"{metrics.get('recall', 0):.4f}")
     c4.metric("F1", f"{metrics.get('f1', 0):.4f}")
 
     c5, c6, c7, c8 = st.columns(4)
-    c5.metric("Train samples", metrics.get("train_samples", 0))
-    c6.metric("Test samples", metrics.get("test_samples", 0))
-    c7.metric("Pos (test)", metrics.get("pos_test", 0))
-    c8.metric("Neg (test)", metrics.get("neg_test", 0))
+    c5.metric(t("ui.p3.stop_grounding_perf.train_samples"), metrics.get("train_samples", 0))
+    c6.metric(t("ui.p3.stop_grounding_perf.test_samples"), metrics.get("test_samples", 0))
+    c7.metric(t("ui.p3.stop_grounding_perf.pos_test"), metrics.get("pos_test", 0))
+    c8.metric(t("ui.p3.stop_grounding_perf.neg_test"), metrics.get("neg_test", 0))
 
 
 def _render_score_distributions(df: pd.DataFrame):
@@ -136,17 +136,17 @@ def _render_score_distributions(df: pd.DataFrame):
 
     # Heuristic score distribution by label
     if "heuristic_score" in df.columns:
-        st.markdown("#### Heuristic Score by Label")
+        st.markdown(t("ui.p3.stop_grounding_perf.heuristic_score_by_label"))
         chart_data = pd.DataFrame({
-            "On-route": df[df["is_on_route"] == 1]["heuristic_score"],
-            "Not on-route": df[df["is_on_route"] == 0]["heuristic_score"],
+            t("sg.on_route"): df[df["is_on_route"] == 1]["heuristic_score"],
+            t("sg.not_on_route"): df[df["is_on_route"] == 0]["heuristic_score"],
         })
         st.bar_chart(
             pd.DataFrame({
-                "On-route": df[df["is_on_route"] == 1]["heuristic_score"]
+                t("sg.on_route"): df[df["is_on_route"] == 1]["heuristic_score"]
                 .value_counts(bins=20, sort=False)
                 .sort_index(),
-                "Not on-route": df[df["is_on_route"] == 0]["heuristic_score"]
+                t("sg.not_on_route"): df[df["is_on_route"] == 0]["heuristic_score"]
                 .value_counts(bins=20, sort=False)
                 .sort_index(),
             })
@@ -154,20 +154,20 @@ def _render_score_distributions(df: pd.DataFrame):
 
     # Distance to corridor distribution
     if "distance_to_corridor_m" in df.columns:
-        st.markdown("#### Distance to Corridor (m) by Label")
+        st.markdown(t("ui.p3.stop_grounding_perf.distance_corridor_m_by_label"))
         st.bar_chart(
             pd.DataFrame({
-                "On-route": df[df["is_on_route"] == 1]["distance_to_corridor_m"]
+                t("sg.on_route"): df[df["is_on_route"] == 1]["distance_to_corridor_m"]
                 .value_counts(bins=20, sort=False)
                 .sort_index(),
-                "Not on-route": df[df["is_on_route"] == 0]["distance_to_corridor_m"]
+                t("sg.not_on_route"): df[df["is_on_route"] == 0]["distance_to_corridor_m"]
                 .value_counts(bins=20, sort=False)
                 .sort_index(),
             })
         )
 
     # Key feature stats
-    st.markdown("#### Feature Statistics by Label")
+    st.markdown(t("ui.p3.stop_grounding_perf.feature_statistics_by_label"))
     key_features = [
         "distance_to_corridor_m", "path_fraction", "gap_to_prev_m",
         "gap_to_next_m", "local_density_200m", "heuristic_score",
@@ -179,11 +179,11 @@ def _render_score_distributions(df: pd.DataFrame):
             on = df[df["is_on_route"] == 1][feat]
             off = df[df["is_on_route"] == 0][feat]
             stats_rows.append({
-                "Feature": feat,
-                "On-route mean": f"{on.mean():.2f}",
-                "On-route median": f"{on.median():.2f}",
-                "Not-on-route mean": f"{off.mean():.2f}",
-                "Not-on-route median": f"{off.median():.2f}",
+                t("sg.col.feature"): feat,
+                t("sg.col.on_mean"): f"{on.mean():.2f}",
+                t("sg.col.on_median"): f"{on.median():.2f}",
+                t("sg.col.off_mean"): f"{off.mean():.2f}",
+                t("sg.col.off_median"): f"{off.median():.2f}",
             })
         st.dataframe(pd.DataFrame(stats_rows), use_container_width=True, hide_index=True)
 
@@ -194,46 +194,46 @@ def _render_score_distributions(df: pd.DataFrame):
 
 def _render_feature_importance():
     if not Path(_MODEL_PATH).exists():
-        st.info("No trained model found. Train a model first.")
+        st.info(t("ui.p3.stop_grounding_perf.no_trained_model_found_train_model"))
         return
 
     try:
         import lightgbm as lgb
         model = lgb.Booster(model_file=_MODEL_PATH)
     except ImportError:
-        st.error("lightgbm not installed.")
+        st.error(t("ui.p3.stop_grounding_perf.lightgbm_not_installed"))
         return
     except Exception as e:
-        st.error(f"Failed to load model: {e}")
+        st.error(t("ui.p3.stop_grounding_perf.failed_load_model_e", e=(e)))
         return
 
     feature_names = model.feature_name()
     importance_split = model.feature_importance(importance_type="split").tolist()
     importance_gain = model.feature_importance(importance_type="gain").tolist()
 
-    st.markdown("### Feature Importance")
+    st.markdown(t("ui.p3.stop_grounding_perf.feature_importance_2"))
 
     imp_df = pd.DataFrame({
-        "Feature": feature_names,
-        "Split count": importance_split,
-        "Gain": [round(g, 1) for g in importance_gain],
-    }).sort_values("Split count", ascending=False)
+        t("sg.col.feature"): feature_names,
+        t("sg.col.split_count"): importance_split,
+        t("sg.col.gain"): [round(g, 1) for g in importance_gain],
+    }).sort_values(t("sg.col.split_count"), ascending=False)
 
     # Bar chart
-    st.markdown("#### By Split Count (how often used)")
-    chart_df = imp_df.set_index("Feature")["Split count"].sort_values(ascending=True)
+    st.markdown(t("ui.p3.stop_grounding_perf.by_split_count_how_often_used"))
+    chart_df = imp_df.set_index(t("sg.col.feature"))[t("sg.col.split_count")].sort_values(ascending=True)
     st.bar_chart(chart_df)
 
-    st.markdown("#### By Gain (how much it improves predictions)")
+    st.markdown(t("ui.p3.stop_grounding_perf.by_gain_how_much_it_improves"))
     chart_df2 = imp_df.set_index("Feature")["Gain"].sort_values(ascending=True)
     st.bar_chart(chart_df2)
 
     # Table
-    st.markdown("#### Full Table")
+    st.markdown(t("ui.p3.stop_grounding_perf.full_table"))
     st.dataframe(imp_df, use_container_width=True, hide_index=True)
 
     # Model info
-    st.markdown("### Model Info")
+    st.markdown(t("ui.p3.stop_grounding_perf.model_info"))
     st.json({
         "num_trees": model.num_trees(),
         "num_features": model.num_feature(),
@@ -248,10 +248,10 @@ def _render_feature_importance():
 def _render_per_route():
     df = _load_training_data()
     if df is None or df.empty:
-        st.info("No training data available.")
+        st.info(t("ui.p3.stop_grounding_perf.no_training_data_available"))
         return
 
-    st.markdown("### Per-Route Breakdown")
+    st.markdown(t("ui.p3.stop_grounding_perf.per_route_breakdown"))
 
     route_stats = []
     for route_id, group in df.groupby("route_id"):
@@ -265,15 +265,15 @@ def _render_per_route():
         n_stops = group["route_n_stops"].iloc[0] if "route_n_stops" in group.columns else 0
 
         route_stats.append({
-            "Route": str(route_name)[:50] if route_name else str(route_id)[:12],
-            "Samples": n,
-            "Positive": pos,
-            "Negative": neg,
-            "Pos %": f"{pos / n * 100:.0f}%",
-            "Avg dist (on-route)": f"{avg_dist_pos:.0f}m",
-            "Avg dist (off-route)": f"{avg_dist_neg:.0f}m",
-            "Length km": f"{length_km:.1f}",
-            "Prod stops": int(n_stops),
+            t("col.route"): str(route_name)[:50] if route_name else str(route_id)[:12],
+            t("sg.col.samples"): n,
+            t("sg.col.positive"): pos,
+            t("sg.col.negative"): neg,
+            t("sg.col.pos_pct"): f"{pos / n * 100:.0f}%",
+            t("sg.col.avg_dist_on"): f"{avg_dist_pos:.0f}m",
+            t("sg.col.avg_dist_off"): f"{avg_dist_neg:.0f}m",
+            t("sg.col.length_km"): f"{length_km:.1f}",
+            t("sg.col.prod_stops"): int(n_stops),
         })
 
     stats_df = pd.DataFrame(route_stats)
@@ -283,8 +283,7 @@ def _render_per_route():
     total_pos = sum(r["Positive"] for r in route_stats)
     total_neg = sum(r["Negative"] for r in route_stats)
     st.caption(
-        f"Total: {len(route_stats)} routes, {total_pos} positive, {total_neg} negative "
-        f"({total_pos / (total_pos + total_neg) * 100:.1f}% positive rate)"
+        t("ui.p3.stop_grounding_perf.total_n_route_stats_routes_total", n_route_stats=(len(route_stats)), total_pos=(total_pos), total_neg=(total_neg), total_pos_2=format((total_pos / (total_pos + total_neg) * 100), '.1f'))
     )
 
 
@@ -293,20 +292,19 @@ def _render_per_route():
 # ---------------------------------------------------------------------------
 
 def _render_retrain():
-    st.markdown("### Retrain On-Route Classifier")
+    st.markdown(t("ui.p3.stop_grounding_perf.retrain_route_classifier"))
     st.caption(
-        "Rebuilds training data from ALL prod routes and retrains the LightGBM model. "
-        "Uses routes with `stop_node_ids` + geometry as ground truth."
+        t("ui.p3.stop_grounding_perf.rebuilds_training_data_from_all_prod")
     )
 
     col1, col2 = st.columns(2)
     with col1:
-        max_routes = st.number_input("Max routes (0=all)", min_value=0, value=0, key="routes_perf_max_routes")
+        max_routes = st.number_input(t("ui.p3.stop_grounding_perf.max_routes_0_all"), min_value=0, value=0, key="p3.perf.max_routes")
     with col2:
-        test_size = st.slider("Test split %", 10, 40, 20, key="p3.perf.test_size") / 100.0
+        test_size = st.slider(t("ui.p3.stop_grounding_perf.test_split"), 10, 40, 20, key="p3.perf.test_size") / 100.0
 
-    if st.button("Build Training Data & Train Model", type="primary", use_container_width=True):
-        with st.spinner("Building training data from prod routes..."):
+    if st.button(t("ui.p3.stop_grounding_perf.build_training_data_train_model"), type="primary", use_container_width=True):
+        with st.spinner(t("ui.p3.stop_grounding_perf.building_training_data_from_prod_routes")):
             try:
                 from datamind_console.phases.phase3_routes.stop_grounding.training_data_builder import (
                     build_training_dataset,
@@ -319,18 +317,18 @@ def _render_retrain():
                 )
 
                 if not samples:
-                    st.error("No training samples generated. Check that prod routes have stop_node_ids + geometry.")
+                    st.error(t("ui.p3.stop_grounding_perf.no_training_samples_generated_check_that"))
                     return
 
                 save_training_dataset(samples, _TRAINING_DATA_PATH)
-                st.success(f"Training data: {len(samples)} samples saved.")
+                st.success(t("ui.p3.stop_grounding_perf.training_data_n_samples_samples_saved", n_samples=(len(samples))))
 
             except Exception as e:
-                st.error(f"Failed to build training data: {e}")
+                st.error(t("ui.p3.stop_grounding_perf.failed_build_training_data_e", e=(e)))
                 _LOG.exception("Training data build failed")
                 return
 
-        with st.spinner("Training LightGBM model..."):
+        with st.spinner(t("ui.p3.stop_grounding_perf.training_lightgbm_model")):
             try:
                 result = train_lightgbm_model(
                     samples,
@@ -347,14 +345,14 @@ def _render_retrain():
                 mod._lgbm_model = None
                 mod._lgbm_load_attempted = False
 
-                st.success("Model trained successfully!")
+                st.success(t("ui.p3.stop_grounding_perf.model_trained_successfully"))
                 _display_metrics(result)
                 st.session_state["p3.grounding_perf.last_eval"] = result
 
                 # Show feature importance inline
                 fi = result.get("feature_importance", {})
                 if fi:
-                    st.markdown("#### Feature Importance (split count)")
+                    st.markdown(t("ui.p3.stop_grounding_perf.feature_importance_split_count"))
                     fi_df = pd.DataFrame(
                         sorted(fi.items(), key=lambda x: x[1], reverse=True),
                         columns=["Feature", "Importance"],
@@ -362,17 +360,17 @@ def _render_retrain():
                     st.bar_chart(fi_df.set_index("Feature"))
 
             except Exception as e:
-                st.error(f"Training failed: {e}")
+                st.error(t("ui.p3.stop_grounding_perf.training_failed_e", e=(e)))
                 _LOG.exception("LightGBM training failed")
 
     # Quick eval without retraining
     st.divider()
-    if st.button("Evaluate current model (no retrain)", use_container_width=True):
+    if st.button(t("ui.p3.stop_grounding_perf.evaluate_current_model_no_retrain"), use_container_width=True):
         df = _load_training_data()
         if df is None or df.empty:
-            st.warning("No training data available. Build it first.")
+            st.warning(t("ui.p3.stop_grounding_perf.no_training_data_available_build_it"))
             return
-        with st.spinner("Evaluating..."):
+        with st.spinner(t("ui.p3.stop_grounding_perf.evaluating")):
             metrics = _evaluate_model(df)
         if metrics:
             _display_metrics(metrics)
@@ -404,10 +402,10 @@ def _evaluate_model(df: pd.DataFrame) -> Dict[str, Any]:
         from sklearn.model_selection import train_test_split
         from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_score
     except ImportError as e:
-        return {"error": f"Missing dependency: {e}"}
+        return {"error": t("sg.missing_dependency", e=e)}
 
     if not Path(_MODEL_PATH).exists():
-        return {"error": "Model file not found"}
+        return {"error": t("sg.model_not_found")}
 
     model = lgb.Booster(model_file=_MODEL_PATH)
 

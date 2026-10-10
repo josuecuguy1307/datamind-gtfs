@@ -5,6 +5,7 @@ from typing import Any
 import streamlit as st
 
 from ._gtfs_step_preview import render_gtfs_step_output_preview
+from datamind_console.i18n import t
 
 
 def _shape_rows_for_scope(
@@ -35,33 +36,38 @@ def _shape_rows_for_scope(
 
 
 def render_step03b_shapes_tab(*, ctx: Any, client: Any, **_) -> None:
-    st.markdown("### Step 02b Insert shapes (direction-aware)")
+    st.markdown(t("ui.p5.step03b_shapes.step_02b_insert_shapes_direction_aware"))
     run_id = (st.session_state.get("phase5.export_run_id") or "").strip()
     route_id = (st.session_state.get("phase5.route_id") or "").strip()
     service_route_id = (st.session_state.get("phase5.service_route_id") or "").strip()
     selected_direction = int(st.session_state.get("phase5.direction_id") or 0)
 
     if not run_id:
-        st.info("Create/select gtfs_id first (internal export context is created automatically).")
+        st.info(t("ui.p5.step03b_shapes.create_select_gtfs_id_first_internal"))
         return
 
     st.caption(
-        f"Context: service_route_id=`{service_route_id or '-'}` | route_id=`{route_id or '-'}` | direction_id=`{selected_direction}`"
+        t("ui.p5.step03b_shapes.context_service_route_id_service_route", service_route_id=(service_route_id or '-'), route_id=(route_id or '-'), selected_direction=(selected_direction))
     )
-    st.caption("Shapes are generated per route+direction. Direction 1 uses reversed geometry order by default.")
+    st.caption(t("ui.p5.step03b_shapes.shapes_generated_per_route_direction_direction"))
 
     mode = st.radio(
-        "Shape insert mode",
+        t("ui.p5.step03b_shapes.shape_insert_mode"),
         options=[
             "Selected route + selected direction",
             "Selected route (all active directions)",
             "All routes (all active directions)",
         ],
+        format_func=lambda v: t({
+            "Selected route + selected direction": "p5.shapes_mode.route_direction",
+            "Selected route (all active directions)": "p5.shapes_mode.route_all_directions",
+            "All routes (all active directions)": "p5.shapes_mode.all_routes",
+        }.get(v, "common.unknown")),
         horizontal=True,
         key="p5.step02b.shapes.mode",
     )
 
-    if st.button("Run Step 02b (insert shapes)", type="primary", use_container_width=True, key="p5.step02b.shapes.run"):
+    if st.button(t("ui.p5.step03b_shapes.run_step_02b_insert_shapes"), type="primary", use_container_width=True, key="p5.step02b.shapes.run"):
         try:
             if mode == "Selected route + selected direction":
                 if not route_id:
@@ -76,25 +82,25 @@ def render_step03b_shapes_tab(*, ctx: Any, client: Any, **_) -> None:
         except Exception as e:
             st.error(str(e))
         else:
-            st.success("Step 02b completed.")
+            st.success(t("ui.p5.step03b_shapes.step_02b_completed"))
             st.json(out)
 
     st.divider()
     preview_cap = int(
         st.number_input(
-            "Shapes preview row cap",
+            t("ui.p5.step03b_shapes.shapes_preview_row_cap"),
             min_value=500,
             max_value=100000,
             value=12000,
             step=500,
             key="p5.step02b.shapes.preview_cap",
-            help="UI preview/counters are based on rows loaded here. JSON run result shows the true inserted total.",
+            help=t("ui.p5.step03b_shapes.ui_preview_counters_based_rows_loaded"),
         )
     )
     try:
         all_shape_rows = client.list_gtfs_rows("gtfs_shapes", run_id, route_id=None, limit=int(preview_cap)) or []
     except Exception as e:
-        st.error(f"Failed to load shapes preview: {e}")
+        st.error(t("ui.p5.step03b_shapes.failed_load_shapes_preview_e", e=(e)))
         all_shape_rows = []
 
     preview_scope_route_id = None
@@ -116,24 +122,23 @@ def render_step03b_shapes_tab(*, ctx: Any, client: Any, **_) -> None:
     try:
         total_shape_counts = client.get_gtfs_shape_counts(run_id) or {}
     except Exception as e:
-        st.caption(f"Total shapes count unavailable: {e}")
+        st.caption(t("ui.p5.step03b_shapes.total_shapes_count_unavailable_e", e=(e)))
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("shape rows shown (preview)", len(scoped_shape_rows))
-    c2.metric("shapes in preview", len(shape_ids))
-    c3.metric("shape rows total", int(total_shape_counts.get("shape_rows") or 0))
-    c4.metric("shapes total", int(total_shape_counts.get("shape_ids") or 0))
+    c1.metric(t("ui.p5.step03b_shapes.shape_rows_shown_preview"), len(scoped_shape_rows))
+    c2.metric(t("ui.p5.step03b_shapes.shapes_preview"), len(shape_ids))
+    c3.metric(t("ui.p5.step03b_shapes.shape_rows_total"), int(total_shape_counts.get("shape_rows") or 0))
+    c4.metric(t("ui.p5.step03b_shapes.shapes_total"), int(total_shape_counts.get("shape_ids") or 0))
     if len(all_shape_rows) >= preview_cap:
         st.caption(
-            f"Preview is capped at {preview_cap:,} shape-point rows. "
-            "The JSON result from Step 02b reports the actual inserted total."
+            t("ui.p5.step03b_shapes.preview_capped_at_preview_cap_shape", preview_cap=format((preview_cap), ','))
         )
 
     if shape_ids:
-        st.caption("Generated shapes in current preview scope")
+        st.caption(t("ui.p5.step03b_shapes.generated_shapes_current_preview_scope"))
         st.dataframe([{"shape_id": s} for s in shape_ids[:500]], use_container_width=True, hide_index=True, height=160)
     else:
-        st.info("No shapes generated yet for current preview scope.")
+        st.info(t("ui.p5.step03b_shapes.no_shapes_generated_yet_current_preview"))
 
     if scoped_shape_rows:
         show_rows = [
@@ -146,7 +151,7 @@ def render_step03b_shapes_tab(*, ctx: Any, client: Any, **_) -> None:
             }
             for r in scoped_shape_rows[:600]
         ]
-        st.caption("Shape points preview")
+        st.caption(t("ui.p5.step03b_shapes.shape_points_preview"))
         st.dataframe(show_rows, use_container_width=True, hide_index=True, height=220)
 
     render_gtfs_step_output_preview(
@@ -154,7 +159,7 @@ def render_step03b_shapes_tab(*, ctx: Any, client: Any, **_) -> None:
         export_run_id=run_id,
         key="p5.step03b.preview",
         route_id=(route_id or None),
-        title="Step 02b GTFS output preview (shapes)",
+        title=t("p5.step02b.preview_title"),
         default_tables=["gtfs_shapes"],
-        note="Direction-aware shapes use `shape_<service_route_id>_d<direction_id>` (fallback legacy format may appear for older rows).",
+        note=t("p5.step02b.preview_note"),
     )

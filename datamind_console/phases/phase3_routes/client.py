@@ -18,6 +18,8 @@ from statistics import median
 
 # --- DB helpers (your project) ---
 from phase3_routes.services.route_constructor.src.db.conn import db_conn, db_cursor
+from datamind_console.db import schema_guard as _schema_guard
+from datamind_console.phases.phase3_routes import schema as _phase3_schema
 
 # --- Phase 3 pipeline helpers you already have ---
 from phase3_routes.services.route_constructor.src.db.geo_prod_repo import nearest_stop_node
@@ -113,8 +115,10 @@ except Exception:
     score_route_pair_evidence = None
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def _get_phase3_client():
+    # No spinner text: Streamlit's default shows the raw function name. The
+    # constructor no longer touches the database, so this is instantaneous.
     return Phase3Client()
 
 
@@ -1968,18 +1972,10 @@ class Phase3Client:
         *,
         overpass_url: Optional[str] = None,
     ) -> None:
+        # Constructing the client must not touch the database: the Streamlit
+        # page caches one instance and renders immediately. Schema objects are
+        # verified lazily, read-only, by the ``_ensure_*`` methods below.
         self.overpass_url = overpass_url or _env("OVERPASS_URL", "http://127.0.0.1:12346/api/interpreter")
-        self._direction_schema_ready = False
-        self._trash_schema_ready = False
-        self._sequence_resolution_schema_ready = False
-        self._manual_sequence_schema_ready = False
-        self._extractor_review_schema_ready = False
-        self._route_review_schema_ready = False
-        self._inverse_completion_schema_ready = False
-        self._geometry_stop_recovery_schema_ready = False
-        self._ensure_direction_schema()
-        self._ensure_trash_schema()
-        self._ensure_sequence_resolution_schema()
 
     def raw_query(self, sql: str, params: Optional[tuple] = None) -> List[Dict[str, Any]]:
         """Execute a read-only SQL query and return rows as dicts."""
@@ -2101,121 +2097,48 @@ class Phase3Client:
         except Exception:
             pass
 
+    # -------------------------------------------------------------------------
+    # Schema verification (read-only)
+    #
+    # These methods used to execute whole SQL files (DDL + data backfills) from
+    # read paths, so opening the Phase 3 page rewrote production tables. They
+    # now only verify catalog objects; applying the SQL is an explicit
+    # administrative action: ``python -m datamind_console.db.schema_cli``.
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _require_schema(unit: Any) -> None:
+        _schema_guard.require(unit, connection_factory=db_conn)
+
     def _ensure_direction_schema(self) -> None:
-        if self._direction_schema_ready:
-            return
-        sql_path = _phase3_root() / "sql" / "012_route_direction_gate.sql"
-        if not sql_path.exists():
-            self._direction_schema_ready = True
-            return
-        sql = sql_path.read_text(encoding="utf-8")
-        with db_conn() as conn:
-            with db_cursor(conn) as cur:
-                cur.execute(sql)
-        self._direction_schema_ready = True
+        self._require_schema(_phase3_schema.DIRECTION_GATE)
 
     def _ensure_manual_sequence_schema(self) -> None:
-        if self._manual_sequence_schema_ready:
-            return
-        sql_path = _phase3_root() / "sql" / "021_manual_sequence_builder.sql"
-        if not sql_path.exists():
-            self._manual_sequence_schema_ready = True
-            return
-        sql = sql_path.read_text(encoding="utf-8")
-        with db_conn() as conn:
-            with db_cursor(conn) as cur:
-                cur.execute(sql)
-        self._manual_sequence_schema_ready = True
+        self._require_schema(_phase3_schema.MANUAL_SEQUENCE)
 
     def _ensure_trash_schema(self) -> None:
-        if self._trash_schema_ready:
-            return
-        sql_path = _phase3_root() / "sql" / "030_route_trash.sql"
-        if not sql_path.exists():
-            self._trash_schema_ready = True
-            return
-        sql = sql_path.read_text(encoding="utf-8")
-        with db_conn() as conn:
-            with db_cursor(conn) as cur:
-                cur.execute(sql)
-        self._trash_schema_ready = True
+        self._require_schema(_phase3_schema.TRASH)
 
     def _ensure_sequence_resolution_schema(self) -> None:
-        if self._sequence_resolution_schema_ready:
-            return
-        sql_path = _phase3_root() / "sql" / "023_sequence_resolution.sql"
-        if not sql_path.exists():
-            self._sequence_resolution_schema_ready = True
-            return
-        sql = sql_path.read_text(encoding="utf-8")
-        with db_conn() as conn:
-            with db_cursor(conn) as cur:
-                cur.execute(sql)
-        self._sequence_resolution_schema_ready = True
+        self._require_schema(_phase3_schema.SEQUENCE_RESOLUTION)
 
     def _ensure_extractor_review_schema(self) -> None:
-        if self._extractor_review_schema_ready:
-            return
-        sql_path = _phase3_root() / "sql" / "013_route_extract_review.sql"
-        if not sql_path.exists():
-            self._extractor_review_schema_ready = True
-            return
-        sql = sql_path.read_text(encoding="utf-8")
         try:
-            with db_conn() as conn:
-                with db_cursor(conn) as cur:
-                    cur.execute(sql)
-        except Exception:
-            # Review persistence must not block extractor execution.
+            self._require_schema(_phase3_schema.EXTRACTOR_REVIEW)
+        except Exception as exc:
+            # Review persistence must not block extractor execution. This is
+            # the existing contract; the old code swallowed every error here.
+            _LOG.warning("phase3.extractor_review_schema_unavailable: %s", exc)
             return
-        self._extractor_review_schema_ready = True
 
     def _ensure_route_review_schema(self) -> None:
-        if self._route_review_schema_ready:
-            return
-        self._ensure_manual_sequence_schema()
-        self._ensure_trash_schema()
-        sql_path = _phase3_root() / "sql" / "022_route_review_coverage.sql"
-        if not sql_path.exists():
-            self._route_review_schema_ready = True
-            return
-        sql = sql_path.read_text(encoding="utf-8")
-        with db_conn() as conn:
-            with db_cursor(conn) as cur:
-                cur.execute(sql)
-        self._route_review_schema_ready = True
+        self._require_schema(_phase3_schema.ROUTE_REVIEW)
 
     def _ensure_inverse_completion_schema(self) -> None:
-        if self._inverse_completion_schema_ready:
-            return
-        self._ensure_direction_schema()
-        with db_conn() as conn:
-            with db_cursor(conn) as cur:
-                cur.execute("DROP VIEW IF EXISTS route_work.v_direction_readiness")
-                for filename in (
-                    "024_inverse_direction_status.sql",
-                    "025_inverse_direction_proposals.sql",
-                    "026_inverse_direction_search.sql",
-                ):
-                    sql_path = _phase3_root() / "sql" / filename
-                    if not sql_path.exists():
-                        continue
-                    sql = sql_path.read_text(encoding="utf-8")
-                    cur.execute(sql)
-        self._inverse_completion_schema_ready = True
+        self._require_schema(_phase3_schema.INVERSE_COMPLETION)
 
     def _ensure_geometry_stop_recovery_schema(self) -> None:
-        if self._geometry_stop_recovery_schema_ready:
-            return
-        sql_path = _phase3_root() / "sql" / "027_geometry_stop_recovery.sql"
-        if not sql_path.exists():
-            self._geometry_stop_recovery_schema_ready = True
-            return
-        sql = sql_path.read_text(encoding="utf-8")
-        with db_conn() as conn:
-            with db_cursor(conn) as cur:
-                cur.execute(sql)
-        self._geometry_stop_recovery_schema_ready = True
+        self._require_schema(_phase3_schema.GEOMETRY_STOP_RECOVERY)
 
     # -------------------------------------------------------------------------
     # Health

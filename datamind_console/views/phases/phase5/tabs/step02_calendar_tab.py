@@ -5,20 +5,21 @@ from typing import Any
 import streamlit as st
 
 from ._gtfs_step_preview import render_gtfs_step_output_preview
+from datamind_console.i18n import t
 
 
 def render_step02_calendar_tab(*, ctx: Any, client: Any, **_) -> None:
-    st.markdown("### Step 03 Build calendar")
+    st.markdown(t("ui.p5.step02_calendar.step_03_build_calendar"))
     run_id = (st.session_state.get("phase5.export_run_id") or "").strip()
     route_id = (st.session_state.get("phase5.route_id") or "").strip()
     direction_id = int(st.session_state.get("phase5.direction_id") or 0)
     run_mode = str(st.session_state.get("phase5.run_mode") or "One by one")
     if not run_id:
-        st.info("Create/select gtfs_id first (internal export context is created automatically).")
+        st.info(t("ui.p5.step02_calendar.create_select_gtfs_id_first_internal"))
         return
 
-    st.markdown("#### Service days preset")
-    st.caption("Apply a standard day-pattern to service windows before building calendar.")
+    st.markdown(t("ui.p5.step02_calendar.service_days_preset"))
+    st.caption(t("ui.p5.step02_calendar.apply_standard_day_pattern_service_windows"))
     presets = {
         "Mon-Fri": dict(monday=True, tuesday=True, wednesday=True, thursday=True, friday=True, saturday=False, sunday=False),
         "Mon-Sat": dict(monday=True, tuesday=True, wednesday=True, thursday=True, friday=True, saturday=True, sunday=False),
@@ -27,16 +28,20 @@ def render_step02_calendar_tab(*, ctx: Any, client: Any, **_) -> None:
         "Thu-Sat": dict(monday=False, tuesday=False, wednesday=False, thursday=True, friday=True, saturday=True, sunday=False),
         "Weekend": dict(monday=False, tuesday=False, wednesday=False, thursday=False, friday=False, saturday=True, sunday=True),
     }
-    preset_name = st.selectbox("Preset", list(presets.keys()), index=0, key="p5.step02.preset")
+    preset_name = st.selectbox(
+        t("ui.p5.step02_calendar.preset"), list(presets.keys()), index=0, key="p5.step02.preset",
+        format_func=lambda v: t(f"p5.preset.{v.lower().replace('-', '_')}"),
+    )
     scope = st.radio(
-        "Apply to",
+        t("ui.p5.step02_calendar.apply"),
         options=["Current route + direction", "All routes (bulk)"],
+        format_func=lambda v: t("p5.scope.all_routes") if v == "All routes (bulk)" else t("p5.scope.current_route"),
         horizontal=True,
         key="p5.step02.preset.scope",
     )
     if scope == "All routes (bulk)" and run_mode != "Bulk (multi-route)":
-        st.info("Switch to Bulk (multi-route) if you want this to apply to all routes.")
-    if st.button("Apply preset to service windows", use_container_width=True, key="p5.step02.preset.apply"):
+        st.info(t("ui.p5.step02_calendar.switch_bulk_multi_route_if_you"))
+    if st.button(t("ui.p5.step02_calendar.apply_preset_service_windows"), use_container_width=True, key="p5.step02.preset.apply"):
         try:
             if scope == "Current route + direction":
                 if not route_id:
@@ -54,35 +59,35 @@ def render_step02_calendar_tab(*, ctx: Any, client: Any, **_) -> None:
         except Exception as e:
             st.error(str(e))
         else:
-            st.success(f"Preset applied to {out.get('updated')} window rows.")
+            st.success(t("ui.p5.step02_calendar.preset_applied_updated_window_rows", updated=(out.get('updated'))))
 
-    if st.button("Run Step 02", type="primary", use_container_width=True, key="p5.step02.run"):
-        with st.spinner("Building calendar..."):
+    if st.button(t("ui.p5.step02_calendar.run_step_02"), type="primary", use_container_width=True, key="p5.step02.run"):
+        with st.spinner(t("ui.p5.step02_calendar.building_calendar")):
             try:
                 out = client.run_step_02_calendar(run_id)
             except Exception as e:
                 st.error(str(e))
                 return
-        st.success("Step 02 completed.")
+        st.success(t("ui.p5.step02_calendar.step_02_completed"))
         st.json(out)
 
-    with st.expander("Deletion log (Phase 5 revisions)", expanded=False):
+    with st.expander(t("ui.p5.step02_calendar.deletion_log_phase_5_revisions"), expanded=False):
         try:
             logs = client.list_revision_events(export_run_id=run_id, event_type="step_rebuild_delete", limit=200)
         except Exception as e:
-            st.error(f"Failed to load deletion log: {e}")
+            st.error(t("ui.p5.step02_calendar.failed_load_deletion_log_e", e=(e)))
             logs = []
         if logs:
             st.dataframe(logs, use_container_width=True, hide_index=True, height=220)
         else:
-            st.info("No deletion log entries yet.")
+            st.info(t("ui.p5.step02_calendar.no_deletion_log_entries_yet"))
 
     render_gtfs_step_output_preview(
         client=client,
         export_run_id=run_id,
         key="p5.step02.preview",
         route_id=(st.session_state.get("phase5.route_id") or "").strip() or None,
-        title="Step 02 GTFS output preview (calendar tables)",
+        title=t("p5.step02.calendar_preview_title"),
         default_tables=["gtfs_calendar", "gtfs_calendar_dates", "gtfs_trips"],
-        note="Shows calendar rows currently available for the selected route scope (derived via trips service_id).",
+        note=t("p5.step02.calendar_preview_note"),
     )

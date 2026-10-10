@@ -7,6 +7,7 @@ import streamlit as st
 from ui.deck.render import render_deck
 from ui.deck.viewstate import viewstate_from_points
 from ui.deck.layers.phase2_layers import build_phase2_layers
+from datamind_console.i18n import t
 
 
 def _safe_list(x: Any) -> list:
@@ -53,11 +54,11 @@ def _point_has_coords(p: Dict[str, Any]) -> bool:
 
 
 def render_map_tab(*, ctx: Any, phase2: Any = None, **_) -> None:
-    st.subheader("Phase 2 — Map")
+    st.subheader(t("ui.p124.map.phase_2_map"))
 
     phase2 = phase2 or getattr(ctx, "phase2", None)
     if phase2 is None:
-        st.error("Phase2 client not available (ctx.phase2 missing).")
+        st.error(t("ui.p124.map.phase2_client_not_available_ctx_phase2"))
         return
 
     ss = st.session_state
@@ -67,14 +68,14 @@ def render_map_tab(*, ctx: Any, phase2: Any = None, **_) -> None:
     # --- UI controls
     colA, colB, colC = st.columns([1.2, 1.2, 0.9])
     with colA:
-        show_compare = st.toggle("Compare candidates vs accepted", value=True)
+        show_compare = st.toggle(t("ui.p124.map.compare_candidates_vs_accepted"), value=True)
     with colB:
-        only_with_coords = st.toggle("Only points with coords", value=True)
+        only_with_coords = st.toggle(t("ui.p124.map.only_points_coords"), value=True)
     with colC:
-        limit = st.number_input("Limit", min_value=50, max_value=5000, value=max(50, limit_default), step=50)
+        limit = st.number_input(t("ui.p124.map.limit"), min_value=50, max_value=5000, value=max(50, limit_default), step=50)
 
-    min_score = st.slider("Min score", 0.0, 1.0, 0.0, 0.01)
-    active_only = st.toggle("Active only", value=bool(ss.get("phase2.active_only", True)))
+    min_score = st.slider(t("ui.p124.map.min_score"), 0.0, 1.0, 0.0, 0.01)
+    active_only = st.toggle(t("ui.p124.map.active_only"), value=bool(ss.get("phase2.active_only", True)))
 
     # ------------------------------------------------------------
     # ✅ Fetch candidates:
@@ -120,7 +121,7 @@ def render_map_tab(*, ctx: Any, phase2: Any = None, **_) -> None:
             options = [s.get("place_set_id") or s.get("id") for s in sets]
             options = [o for o in options if o is not None]
             if options:
-                chosen = st.selectbox("Pick Place Set ID", options=options, index=0)
+                chosen = st.selectbox(t("ui.p124.map.pick_place_set_id"), options=options, index=0)
                 ss["phase2.place_set_id"] = chosen
 
         for s in sets:
@@ -150,10 +151,9 @@ def render_map_tab(*, ctx: Any, phase2: Any = None, **_) -> None:
             )
     else:
         st.error(
-            "Phase2 client has no known way to list candidates.\n\n"
-            "Expected one of: list_candidates(...) OR list_candidate_sets(...)."
+            t("ui.p124.map.phase2_client_has_no_known_way")
         )
-        with st.expander("Debug: client methods"):
+        with st.expander(t("ui.p124.map.debug_client_methods")):
             st.write(sorted([m for m in dir(phase2) if not m.startswith("_")]))
         return
 
@@ -197,7 +197,7 @@ def render_map_tab(*, ctx: Any, phase2: Any = None, **_) -> None:
     accepted = [p for p in accepted if isinstance(p, dict) and _ok(p)]
 
     if not candidates and not accepted:
-        st.info("No map points found for the current filters/selection.")
+        st.info(t("ui.p124.map.no_map_points_found_current_filters"))
         return
 
     # --- Build + render layers

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union, Literal
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
+from datamind_console.i18n import t as _t
 
 
 MapTheme = Literal["light", "dark", "datamind"]
@@ -114,7 +115,7 @@ def render_points_map(
     st.markdown(f"#### {title}")
 
     if not points:
-        st.info("No points to display.")
+        st.info(_t("ui.misc.maps.no_points_display"))
         return
 
     df = pd.DataFrame(
@@ -168,7 +169,7 @@ def render_paths_map(
     st.markdown(f"#### {title}")
 
     if not paths:
-        st.info("No paths to display.")
+        st.info(_t("ui.misc.maps.no_paths_display"))
         return
 
     df = pd.DataFrame(
@@ -220,7 +221,7 @@ def render_points_and_paths(
     st.markdown(f"#### {title}")
 
     if not points and not paths:
-        st.info("No map data to display.")
+        st.info(_t("ui.misc.maps.no_map_data_display"))
         return
 
     point_df = pd.DataFrame(
@@ -305,7 +306,7 @@ def render_geojson_map(
     st.markdown(f"#### {title}")
 
     if not geojson or "features" not in geojson:
-        st.info("No GeoJSON to display.")
+        st.info(_t("ui.misc.maps.no_geojson_display"))
         return
 
     resolved = _resolve_theme(theme)

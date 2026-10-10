@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 
 import pandas as pd
 import streamlit as st
+from datamind_console.i18n import t, option_label
 
 
 def render_node_mapping_confidence_table(
@@ -22,20 +23,20 @@ def render_node_mapping_confidence_table(
       - Columns you can show from returned rows:
           node_id, place_candidate_id, confidence
     """
-    st.subheader("Node → Place mapping confidence")
+    st.subheader(t("ui.p124.node_mapping_confidence_table.node_place_mapping_confidence"))
 
     if not place_set_id:
-        st.info("Select a place_set_id first.")
+        st.info(t("ui.p124.node_mapping_confidence_table.select_place_set_id_first"))
         return
 
     try:
         rows: List[Dict[str, Any]] = client.get_node_mapping_confidence(place_set_id)
     except Exception as e:
-        st.error(f"Failed to load node mapping confidence: {e}")
+        st.error(t("ui.p124.node_mapping_confidence_table.failed_load_node_mapping_confidence_e", e=(e)))
         return
 
     if not rows:
-        st.warning("No node mappings found for this place_set_id.")
+        st.warning(t("ui.p124.node_mapping_confidence_table.no_node_mappings_found_this_place"))
         return
 
     df = pd.DataFrame(rows)
@@ -44,7 +45,7 @@ def render_node_mapping_confidence_table(
     expected = ["node_id", "place_candidate_id", "confidence"]
     missing = [c for c in expected if c not in df.columns]
     if missing:
-        st.error(f"Client returned rows missing columns: {missing}")
+        st.error(t("ui.p124.node_mapping_confidence_table.client_returned_rows_missing_columns_missing", missing=(missing)))
         st.dataframe(df.head(50), use_container_width=True)
         return
 
@@ -55,23 +56,24 @@ def render_node_mapping_confidence_table(
     c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.2, 1.4])
     with c1:
         min_conf = st.number_input(
-            "Min confidence",
+            t("ui.p124.node_mapping_confidence_table.min_confidence"),
             value=0.0,
             step=0.05,
             key=f"{key_prefix}:min_conf",
         )
     with c2:
         sort_by = st.selectbox(
-            "Sort by",
+            t("ui.p124.node_mapping_confidence_table.sort_by"),
             options=["confidence", "node_id", "place_candidate_id"],
             index=0,
             key=f"{key_prefix}:sort_by",
+            format_func=option_label("sort_column"),
         )
     with c3:
-        sort_desc = st.checkbox("Desc", value=True, key=f"{key_prefix}:desc")
+        sort_desc = st.checkbox(t("ui.p124.node_mapping_confidence_table.desc"), value=True, key=f"{key_prefix}:desc")
     with c4:
         max_rows = st.number_input(
-            "Max rows",
+            t("ui.p124.node_mapping_confidence_table.max_rows"),
             min_value=50,
             max_value=20000,
             value=int(limit),
@@ -94,10 +96,10 @@ def render_node_mapping_confidence_table(
         c = df["confidence"].dropna()
         if len(c) > 0:
             st.caption(
-                f"rows={len(df)} | conf: min={c.min():.4f} mean={c.mean():.4f} p50={c.median():.4f} max={c.max():.4f}"
+                t("ui.p124.node_mapping_confidence_table.rows_n_df_conf_min_min", n_df=(len(df)), min=format((c.min()), '.4f'), mean=format((c.mean()), '.4f'), median=format((c.median()), '.4f'), max=format((c.max()), '.4f'))
             )
         else:
-            st.caption(f"rows={len(df)} | confidence had only nulls after filtering")
+            st.caption(t("ui.p124.node_mapping_confidence_table.rows_n_df_confidence_had_only", n_df=(len(df))))
 
     st.dataframe(
         df[expected],

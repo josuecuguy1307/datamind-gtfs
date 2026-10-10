@@ -795,6 +795,40 @@ def test_persist_rolls_back_on_synthesis_events_insert_failure(
     assert conn.committed == 0
 
 
+def test_persist_rolls_back_when_node_insert_itself_fails(
+    store, conn, review_root, seeded_path, monkeypatch
+):
+    # Regression: the handler logged ``node_id`` before it was bound, so a
+    # failing node insert surfaced as UnboundLocalError and skipped rollback.
+    route = _route()
+    seeded_path(route.route_id)
+    poi = pm.POIMatch(
+        osm_id=42, osm_type="node",
+        name="X", centroid=(-0.180, -78.470),
+        tags={}, class_name="marketplace", class_priority=100,
+    )
+    monkeypatch.setattr(pm, "query_pois_by_name", lambda *a, **kw: [poi])
+    conn.rolled_back = 0
+
+    def _rollback():
+        conn.rolled_back += 1
+
+    conn.rollback = _rollback
+
+    def _insert_fails(*a, **kw):
+        raise RuntimeError("node insert exploded")
+
+    monkeypatch.setattr(core, "_insert_node", _insert_fails)
+
+    with pytest.raises(RuntimeError, match="node insert exploded"):
+        core.path_aware_synthesis(
+            core.Anchor(name="X"),
+            route, conn=conn, review_root=review_root,
+        )
+    assert conn.rolled_back == 1
+    assert conn.committed == 0
+
+
 # ---------------------------------------------------------------------------
 # 14. Preconditions: research_coords with <4 decimals returns success=False
 # ---------------------------------------------------------------------------

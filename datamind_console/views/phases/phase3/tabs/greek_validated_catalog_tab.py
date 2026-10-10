@@ -14,8 +14,8 @@ for current names + coordinates.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
-import os
 from typing import Any, Optional
 
 import pandas as pd
@@ -24,20 +24,24 @@ import psycopg2.extras
 import pydeck as pdk
 import streamlit as st
 
+from datamind_console.db.db import active_dsn, read_only_connection
+from datamind_console.i18n import t, option_label
+
 
 _LINE_COLOR = [255, 90, 95]
 _STOP_COLOR = [255, 180, 0, 220]
 
 
 def _dsn() -> str:
-    value = os.environ.get("DB_DSN") or os.environ.get("LOCAL_DB_DSN")
-    if not value:
-        raise RuntimeError("DB_DSN or LOCAL_DB_DSN must be configured before loading catalog data.")
-    return value
+    """Canonical active DSN (honours local-only mode); never displayed."""
+    return active_dsn()
 
 
+@contextmanager
 def _connect():
-    return psycopg2.connect(_dsn())
+    """Short-lived READ ONLY connection, always closed (canonical helper)."""
+    with read_only_connection(statement_timeout_ms=30_000) as conn:
+        yield conn
 
 
 def _load_catalog() -> pd.DataFrame:
@@ -127,7 +131,7 @@ def _load_stop_points(seq_cid: str) -> list[dict[str, Any]]:
 
 def _render_map(line: list[list[float]], stops: list[dict[str, Any]]) -> None:
     if not line and not stops:
-        st.info("Sin geometría ni stops para esta ruta.")
+        st.info(t("ui.p3.greek_validated_catalog.sin_geometria_ni_stops_para_esta"))
         return
     layers = []
     if line:
@@ -176,34 +180,32 @@ def _render_map(line: list[list[float]], stops: list[dict[str, Any]]) -> None:
 
 
 def render_greek_validated_catalog_tab(**_: Any) -> None:
-    st.markdown("### GREEK-Validated Catalog")
+    st.markdown(t("ui.p3.greek_validated_catalog.greek_validated_catalog"))
     st.caption(
-        "Routes that cleared the GREEK swap pipeline "
-        "(`route_prod.routes.last_swap_at IS NOT NULL`). Polylines and "
-        "stops shown are the canonical ones dictated by the Phase 3 "
-        "entry section."
+        t("ui.p3.greek_validated_catalog.routes_that_cleared_greek_swap_pipeline")
     )
 
     df = _load_catalog()
     if df.empty:
-        st.info("Aún no hay routes con `last_swap_at` set.")
+        st.info(t("ui.p3.greek_validated_catalog.aun_no_hay_routes_con_last"))
         return
 
     # filters
     c1, c2, c3, c4 = st.columns([1, 1, 1, 2])
     with c1:
         province = st.selectbox(
-            "Provincia",
+            t("ui.p3.greek_validated_catalog.provincia"),
             options=["(all)"] + sorted([p for p in df["province"].dropna().unique()]),
             key="gvc.province",
+            format_func=option_label(),
         )
     with c2:
         sectors = sorted([s for s in df["sector"].dropna().unique()])
-        sector = st.selectbox("Sector", options=["(all)"] + sectors, key="gvc.sector")
+        sector = st.selectbox(t("ui.p3.greek_validated_catalog.sector"), options=["(all)"] + sectors, key="gvc.sector", format_func=option_label())
     with c3:
-        only_gamma = st.checkbox("Sólo γ-clean", value=False, key="gvc.gamma")
+        only_gamma = st.checkbox(t("ui.p3.greek_validated_catalog.solo_clean"), value=False, key="gvc.gamma")
     with c4:
-        q = st.text_input("Buscar (route_name / route_id)", key="gvc.q").strip().lower()
+        q = st.text_input(t("ui.p3.greek_validated_catalog.buscar_route_name_route_id"), key="gvc.q").strip().lower()
 
     view = df.copy()
     if province != "(all)":
@@ -220,9 +222,7 @@ def render_greek_validated_catalog_tab(**_: Any) -> None:
         view = view[mask]
 
     st.markdown(
-        f"**{len(view)} / {len(df)}** routes. "
-        f"γ-clean: **{int(df['gamma_clean'].fillna(False).sum())}** · "
-        f"refill_applied: **{int(df['refill_applied'].fillna(False).sum())}**"
+        t("ui.p3.greek_validated_catalog.n_view_n_df_routes_clean", n_view=(len(view)), n_df=(len(df)), sum=(int(df['gamma_clean'].fillna(False).sum())), sum_2=(int(df['refill_applied'].fillna(False).sum())))
     )
 
     show_cols = [
@@ -239,18 +239,18 @@ def render_greek_validated_catalog_tab(**_: Any) -> None:
         height=420,
     )
 
-    st.markdown("#### Inspección de ruta")
+    st.markdown(t("ui.p3.greek_validated_catalog.inspeccion_de_ruta"))
     if view.empty:
-        st.info("No hay routes con los filtros actuales.")
+        st.info(t("ui.p3.greek_validated_catalog.no_hay_routes_con_los_filtros"))
         return
 
     # picker
     options = [
-        f"{(row['route_name'] or '(sin nombre)')[:60]} · d{int(row['direction_id'])} · {row['route_id'][:8]}"
+        f"{(row['route_name'] or t('common.unnamed'))[:60]} · d{int(row['direction_id'])} · {row['route_id'][:8]}"
         for _, row in view.iterrows()
     ]
     idx = st.selectbox(
-        "Seleccioná una ruta para ver polyline + stops",
+        t("ui.p3.greek_validated_catalog.selecciona_una_ruta_para_ver_polyline"),
         options=range(len(options)),
         format_func=lambda i: options[i],
         key="gvc.pick",
@@ -272,24 +272,15 @@ def render_greek_validated_catalog_tab(**_: Any) -> None:
         _render_map(line or [], stops)
 
     with cols[1]:
-        st.markdown(f"**{selected['route_name'] or '(sin nombre)'}**")
-        st.caption(f"`{selected['route_id']}` · dir `{int(selected['direction_id'])}`")
+        st.markdown(f"**{selected['route_name'] or t('common.unnamed')}**")
+        st.caption(t("ui.p3.greek_validated_catalog.route_id_dir_direction_id", route_id=(selected['route_id']), direction_id=(int(selected['direction_id']))))
         st.markdown(
-            f"- **Operador:** {selected.get('operator') or '—'}\n"
-            f"- **Sector:** {selected.get('sector') or '—'}\n"
-            f"- **Provincia:** {selected.get('province') or '—'}\n"
-            f"- **Pipeline:** `{selected.get('pipeline_version') or '—'}`\n"
-            f"- **Engine geom:** `{selected.get('geom_engine') or '—'}`\n"
-            f"- **Stops:** {int(selected.get('n_stops') or 0)}\n"
-            f"- **Length:** {int(selected.get('length_m') or 0)} m\n"
-            f"- **Shape pts:** {int(selected.get('shape_pts') or 0)}\n"
-            f"- **γ-clean:** {'✅' if selected.get('gamma_clean') else '—'}\n"
-            f"- **Last swap:** {selected.get('last_swap_at')}"
+            t("ui.p3.greek_validated_catalog.operador_operator_sector_sector_provincia_province", operator=(selected.get('operator') or '—'), sector=(selected.get('sector') or '—'), province=(selected.get('province') or '—'), pipeline_version=(selected.get('pipeline_version') or '—'), geom_engine=(selected.get('geom_engine') or '—'), n_stops=(int(selected.get('n_stops') or 0)), length_m=(int(selected.get('length_m') or 0)), shape_pts=(int(selected.get('shape_pts') or 0)), v17=('✅' if selected.get('gamma_clean') else '—'), last_swap_at=(selected.get('last_swap_at')))
         )
 
         if stops:
-            st.markdown("##### Paradas (en orden)")
+            st.markdown(t("ui.p3.greek_validated_catalog.paradas_en_orden"))
             stops_df = pd.DataFrame(stops)[["seq", "stop_name", "stop_id"]]
             st.dataframe(stops_df, use_container_width=True, hide_index=True, height=320)
         else:
-            st.warning("Sin stops para esta ruta.")
+            st.warning(t("ui.p3.greek_validated_catalog.sin_stops_para_esta_ruta"))

@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional
 
 from datamind_console.common.name_normalizer import normalize_name
 from phase5_gtfs.common.config import db_conn
+from phase5_gtfs.common.exportable_stops import EXPORTABLE_STOP
 from phase5_gtfs.errors import assert_no_null_direction_ids, assert_no_unapproved_semantics
 
 
@@ -213,7 +214,7 @@ def build_routes_and_stops(
                     (x.link_status = 'linked' AND COALESCE(NULLIF(BTRIM(x.linked_agency_id), ''), '') <> '')
                     OR COALESCE(NULLIF(BTRIM(x.operator_name), ''), '') <> ''
                   )
-                  AND COALESCE(x.operator_name, '') !~* '^\[pending research\]|^unknown|^desconocido|^unnamed'
+                  AND COALESCE(x.operator_name, '') !~* '^\\[pending research\\]|^unknown|^desconocido|^unnamed'
                 ON CONFLICT (export_run_id, route_id) DO UPDATE SET
                   agency_id = EXCLUDED.agency_id,
                   route_short_name = EXCLUDED.route_short_name,
@@ -252,6 +253,7 @@ def build_routes_and_stops(
                     {stop_where}
                     {('AND' if stop_where else 'WHERE')} COALESCE(r.canonical_sequence_ready, FALSE) = TRUE
                     AND r.chosen_stop_sequence_candidate_id IS NOT NULL
+                    AND {EXPORTABLE_STOP}
                     AND EXISTS (
                         SELECT 1 FROM gtfs_work.route_schedule_profiles sp
                         WHERE sp.route_id = r.route_id AND sp.is_active = true

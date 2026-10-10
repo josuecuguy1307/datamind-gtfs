@@ -19,6 +19,7 @@ import streamlit as st
 
 from datamind_console.db import db_conn, fetch_all
 from datamind_console.ui.components.maps import _deck_theme, _resolve_theme
+from datamind_console.i18n import t
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -48,7 +49,7 @@ def _load_summary(path_str: str) -> List[Dict[str, Any]]:
         return []
 
 
-@st.cache_data(ttl=60, show_spinner="Loading Variant-D routes…")
+@st.cache_data(ttl=60, show_spinner=False)
 def _fetch_routes(route_ids: tuple[str, ...]) -> List[Dict[str, Any]]:
     if not route_ids:
         return []
@@ -75,7 +76,7 @@ def _fetch_routes(route_ids: tuple[str, ...]) -> List[Dict[str, Any]]:
         return []
 
 
-@st.cache_data(ttl=60, show_spinner="Loading stops…")
+@st.cache_data(ttl=60, show_spinner=False)
 def _fetch_stops(route_ids: tuple[str, ...]) -> List[Dict[str, Any]]:
     if not route_ids:
         return []
@@ -129,41 +130,39 @@ _PALETTE = [
 
 def render_variant_d_review_section(summary_path: str | Path = _DEFAULT_SUMMARY) -> None:
     st.divider()
-    st.markdown("### TEMP: Variant-D quality review — quito_sur (10 routes)")
+    st.markdown(t("ui.misc.variant_d_review_section.temp_variant_d_quality_review_quito"))
     st.caption(
-        "Smoke batch built 2026-04-21 from workspace/catalogs/seed/*.json "
-        "(Variant-D shards). Remove this section once the 71-shard backfill is signed off."
+        t("ui.misc.variant_d_review_section.smoke_batch_built_2026_04_21")
     )
 
     summary_rows = _load_summary(str(summary_path))
     if not summary_rows:
-        st.warning(f"No run_summary.json at `{summary_path}`. Run the driver first.")
+        st.warning(t("ui.misc.variant_d_review_section.no_run_summary_json_at_summary", summary_path=(summary_path)))
         return
 
     built = [r for r in summary_rows if r.get("status") == "built"]
     route_ids = tuple(r["route_id"] for r in built if r.get("route_id"))
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Shards processed", len(summary_rows))
-    c2.metric("Built", len(built))
+    c1.metric(t("ui.misc.variant_d_review_section.shards_processed"), len(summary_rows))
+    c2.metric(t("ui.misc.variant_d_review_section.built"), len(built))
     c3.metric(
-        "Blocked / failed",
+        t("ui.misc.variant_d_review_section.blocked_failed"),
         len(summary_rows) - len(built),
     )
     c4.metric(
-        "Synth events",
+        t("ui.misc.variant_d_review_section.synth_events"),
         sum(int(r.get("synthesis_events") or 0) for r in summary_rows),
     )
 
     if not route_ids:
-        st.info("No successfully built rows to review.")
+        st.info(t("ui.misc.variant_d_review_section.no_successfully_built_rows_review"))
         return
 
     routes = _fetch_routes(route_ids)
     if not routes:
         st.error(
-            "Route IDs found in summary but not in route_prod.routes. "
-            "DB mode may be on server — switch to local."
+            t("ui.misc.variant_d_review_section.route_ids_found_summary_but_not")
         )
         return
 
@@ -212,7 +211,8 @@ def render_variant_d_review_section(summary_path: str | Path = _DEFAULT_SUMMARY)
     # Route picker + map --------------------------------------------
     name_options = ["All 10 routes"] + [r["route_name"] for r in rows_df]
     pick = st.selectbox(
-        "Focus route", name_options, index=0, key="variant_d_review.pick"
+        t("ui.misc.variant_d_review_section.focus_route"), name_options, index=0, key="variant_d_review.pick",
+        format_func=lambda v: t("ui.misc.variant_d_review_section.all_routes", n=len(rows_df)) if v == "All 10 routes" else v,
     )
 
     route_color = {}
@@ -243,7 +243,7 @@ def render_variant_d_review_section(summary_path: str | Path = _DEFAULT_SUMMARY)
         )
 
     if not path_data and not selected_stops:
-        st.info("Nothing to map for this selection.")
+        st.info(t("ui.misc.variant_d_review_section.nothing_map_this_selection"))
         return
 
     all_lats: list[float] = []
@@ -340,6 +340,5 @@ def render_variant_d_review_section(summary_path: str | Path = _DEFAULT_SUMMARY)
 
     # Artifact hint --------------------------------------------------
     st.caption(
-        f"Artifacts: `constructor_artifacts/variant_d_quito_sur/<ROUTE_CODE>/` · "
-        f"Summary: `{summary_path}`"
+        t("ui.misc.variant_d_review_section.artifacts_constructor_artifacts_variant_d_quito", summary_path=(summary_path))
     )

@@ -26,12 +26,15 @@ import streamlit as st
 
 from phase5_gtfs.common.ids import new_uuid
 from phase5_gtfs.schedules.validate import validate_window
-from phase5_gtfs.schedules.store import run_all_migrations, ensure_default_profiles_for_verified_routes, ensure_default_windows
+from phase5_gtfs.schedules.store import ensure_default_profiles_for_verified_routes, ensure_default_windows
+from datamind_console.db import schema_guard as _schema_guard
+from datamind_console.phases.phase5_gtfs import schema as _phase5_schema
 from phase5_gtfs.compiler.build_calendar import build_calendar
 from phase5_gtfs.compiler.build_routes import build_routes_and_stops
 from phase5_gtfs.compiler.build_shapes import build_shapes
 from phase5_gtfs.compiler.build_trips import build_trips_and_frequencies
 from phase5_gtfs.compiler.build_stop_times import build_stop_times
+from phase5_gtfs.common.exportable_stops import EXPORTABLE_STOP
 from phase5_gtfs.validator.gtfs_validate import validate_export_run
 from phase5_gtfs.validator.stop_coverage import (
     get_stop_coverage_metrics,
@@ -783,24 +786,15 @@ class Phase5Client:
         return Path(__file__).resolve().parents[3] / "phase5_gtfs"
 
     def _ensure_schema(self) -> None:
+        """Verify, read-only, that the V5 GTFS work schema exists.
+
+        This used to run every V5 migration (DDL and data backfills) on the
+        first call in each process. Applying migrations is now explicit:
+        ``python -m datamind_console.db.schema_cli apply phase5.gtfs_work --yes``.
+        """
         if self._schema_ready:
-            try:
-                with self._conn() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            """
-                            SELECT 1
-                            FROM information_schema.tables
-                            WHERE table_schema = 'gtfs_work'
-                              AND table_name = 'route_runtime_estimate_bindings'
-                            LIMIT 1
-                            """
-                        )
-                        if cur.fetchone():
-                            return
-            except Exception:
-                pass
-        run_all_migrations(self._phase5_root() / "db" / "migrations")
+            return
+        _schema_guard.require(_phase5_schema.GTFS_WORK, connection_factory=self._conn)
         self._schema_ready = True
 
     def _column_exists(self, schema: str, table: str, column: str) -> bool:
@@ -4004,7 +3998,7 @@ class Phase5Client:
             with conn.cursor() as cur:
                 if psid:
                     cur.execute(
-                        """
+                        f"""
                         SELECT DISTINCT
                           n.node_id::text AS stop_id,
                           vp.canonical_name::text AS stop_name,
@@ -4018,6 +4012,7 @@ class Phase5Client:
                         JOIN node_prod.nodes n
                           ON n.node_id::text = sp.node_id::text
                          AND n.node_type = 'STOP'
+                         AND {EXPORTABLE_STOP}
                         JOIN geo_prod.v_place_points vp
                           ON vp.node_id = n.node_id
                          AND vp.node_type = 'STOP'
@@ -4030,7 +4025,7 @@ class Phase5Client:
                     )
                 elif scoped:
                     cur.execute(
-                        """
+                        f"""
                         SELECT DISTINCT
                           n.node_id::text AS stop_id,
                           vp.canonical_name::text AS stop_name,
@@ -4045,6 +4040,7 @@ class Phase5Client:
                         JOIN node_prod.nodes n
                           ON n.node_id = sid.node_id
                          AND n.node_type = 'STOP'
+                         AND {EXPORTABLE_STOP}
                         JOIN geo_prod.v_place_points vp
                           ON vp.node_id = n.node_id
                          AND vp.node_type = 'STOP'
@@ -4057,7 +4053,7 @@ class Phase5Client:
                     )
                 else:
                     cur.execute(
-                        """
+                        f"""
                         SELECT DISTINCT
                           n.node_id::text AS stop_id,
                           vp.canonical_name::text AS stop_name,
@@ -4071,6 +4067,7 @@ class Phase5Client:
                         JOIN node_prod.nodes n
                           ON n.node_id = vp.node_id
                          AND n.node_type = 'STOP'
+                         AND {EXPORTABLE_STOP}
                         WHERE vp.node_type = 'STOP'
                           AND COALESCE(NULLIF(BTRIM(vp.canonical_name), ''), '') <> ''
                         ORDER BY stop_name, stop_id
@@ -4096,7 +4093,7 @@ class Phase5Client:
             with conn.cursor() as cur:
                 if psid:
                     cur.execute(
-                        """
+                        f"""
                         INSERT INTO gtfs_work.gtfs_stops (
                           export_run_id, stop_id, stop_name, stop_lat, stop_lon, location_type, parent_station
                         )
@@ -4112,6 +4109,7 @@ class Phase5Client:
                         JOIN node_prod.nodes n
                           ON n.node_id::text = sp.node_id::text
                          AND n.node_type = 'STOP'
+                         AND {EXPORTABLE_STOP}
                         JOIN geo_prod.v_place_points vp
                           ON vp.node_id = n.node_id
                          AND vp.node_type = 'STOP'
@@ -4126,7 +4124,7 @@ class Phase5Client:
                     )
                 elif scoped:
                     cur.execute(
-                        """
+                        f"""
                         INSERT INTO gtfs_work.gtfs_stops (
                           export_run_id, stop_id, stop_name, stop_lat, stop_lon, location_type, parent_station
                         )
@@ -4143,6 +4141,7 @@ class Phase5Client:
                         JOIN node_prod.nodes n
                           ON n.node_id = sid.node_id
                          AND n.node_type = 'STOP'
+                         AND {EXPORTABLE_STOP}
                         JOIN geo_prod.v_place_points vp
                           ON vp.node_id = n.node_id
                          AND vp.node_type = 'STOP'
@@ -4157,7 +4156,7 @@ class Phase5Client:
                     )
                 else:
                     cur.execute(
-                        """
+                        f"""
                         INSERT INTO gtfs_work.gtfs_stops (
                           export_run_id, stop_id, stop_name, stop_lat, stop_lon, location_type, parent_station
                         )
@@ -4173,6 +4172,7 @@ class Phase5Client:
                         JOIN node_prod.nodes n
                           ON n.node_id = vp.node_id
                          AND n.node_type = 'STOP'
+                         AND {EXPORTABLE_STOP}
                         WHERE vp.node_type = 'STOP'
                           AND COALESCE(NULLIF(BTRIM(vp.canonical_name), ''), '') <> ''
                         ON CONFLICT (export_run_id, stop_id) DO UPDATE SET
@@ -4186,7 +4186,7 @@ class Phase5Client:
 
                 if psid:
                     cur.execute(
-                        """
+                        f"""
                         SELECT COUNT(*)::int AS n
                         FROM gtfs_work.gtfs_stops
                         WHERE export_run_id = %s::uuid
@@ -4196,6 +4196,7 @@ class Phase5Client:
                             JOIN node_prod.nodes n
                               ON n.node_id::text = sp.node_id::text
                              AND n.node_type = 'STOP'
+                             AND {EXPORTABLE_STOP}
                             JOIN geo_prod.v_place_points vp
                               ON vp.node_id = n.node_id
                              AND vp.node_type = 'STOP'
@@ -4207,7 +4208,7 @@ class Phase5Client:
                     )
                 elif scoped:
                     cur.execute(
-                        """
+                        f"""
                         SELECT COUNT(*)::int AS n
                         FROM gtfs_work.gtfs_stops
                         WHERE export_run_id = %s::uuid
@@ -4218,6 +4219,7 @@ class Phase5Client:
                             JOIN node_prod.nodes n
                               ON n.node_id = sid.node_id
                              AND n.node_type = 'STOP'
+                             AND {EXPORTABLE_STOP}
                             JOIN geo_prod.v_place_points vp
                               ON vp.node_id = n.node_id
                              AND vp.node_type = 'STOP'

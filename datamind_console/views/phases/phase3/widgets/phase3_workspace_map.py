@@ -6,6 +6,7 @@ from uuid import UUID
 
 from datamind_console.phases.phase3_routes.client import _get_phase3_client
 from .geom import parse_linestring_wkt, line_to_points_df
+from datamind_console.i18n import t
 
 
 def _geojson_to_points(geojson: Dict[str, Any]) -> List[Dict[str, float]]:
@@ -30,7 +31,7 @@ def render_phase3_workspace_map(*, route_id: str, key: str = "p3_workspace") -> 
     c = _get_phase3_client()
     ss = st.session_state
 
-    st.subheader("Workspace Map")
+    st.subheader(t("ui.p3.phase3_workspace_map.workspace_map"))
 
     # Route selector (from DB list)
     try:
@@ -96,15 +97,16 @@ def render_phase3_workspace_map(*, route_id: str, key: str = "p3_workspace") -> 
         prod = None
 
     # Render priority
-    st.markdown("#### Map")
+    st.markdown(t("ui.p3.phase3_workspace_map.map"))
 
     mode = st.selectbox(
-        "Render mode",
+        t("ui.p3.phase3_workspace_map.render_mode"),
         [
             "Stops only",
             "Shape points (best available)",
         ],
         index=1,
+        format_func=lambda v: t("p3map.mode.stops_only") if v == "Stops only" else t("p3map.mode.shape_points"),
         key=f"{key}.render_mode",
     )
 
@@ -122,16 +124,16 @@ def render_phase3_workspace_map(*, route_id: str, key: str = "p3_workspace") -> 
         if seq_id:
             stops = c.get_stop_points_for_candidate(route_id=UUID(route_id), stop_sequence_candidate_id=UUID(seq_id))
             pts = [{"lat": float(r["lat"]), "lon": float(r["lon"])} for r in stops]
-            _show_points(pts, "No stop points for this sequence.")
+            _show_points(pts, t("p3map.empty.no_stop_points"))
         else:
             stops = c.get_stop_prior_points(UUID(route_id))
             pts = [{"lat": float(r["lat"]), "lon": float(r["lon"])} for r in stops]
-            _show_points(pts, "No stop prior points yet.")
+            _show_points(pts, t("p3map.empty.no_prior_points"))
     else:
         # Shape points: prefer prod -> geometry candidate -> stop sequence -> relation
         if prod and prod.get("geojson"):
             pts = _geojson_to_points(prod.get("geojson"))
-            if _show_points(pts, "Production geometry has no drawable points."):
+            if _show_points(pts, t("p3map.empty.prod_no_points")):
                 pass
         elif geom_id:
             cand = c.get_geometry_candidate(UUID(geom_id))
@@ -140,30 +142,30 @@ def render_phase3_workspace_map(*, route_id: str, key: str = "p3_workspace") -> 
             if line:
                 st.map(line_to_points_df(line))
             else:
-                st.info("Geometry candidate has no drawable line.")
+                st.info(t("ui.p3.phase3_workspace_map.geometry_candidate_has_no_drawable_line"))
         elif seq_id:
             seq_geom = c.get_sequence_geometry(UUID(seq_id))
             pts = _geojson_to_points(seq_geom.get("geojson") or {})
-            _show_points(pts, "Stop sequence has no drawable points.")
+            _show_points(pts, t("p3map.empty.sequence_no_points"))
         else:
             rel_geom = c.get_relation_geometry(UUID(route_id))
             pts = _geojson_to_points(rel_geom.get("geojson") or {})
-            if not _show_points(pts, "No geometry available yet. Run Step 10 or later."):
+            if not _show_points(pts, t("p3map.empty.no_geometry")):
                 return
 
     # Selection controls (below map)
-    st.markdown("#### Select what to display")
+    st.markdown(t("ui.p3.phase3_workspace_map.select_what_display"))
 
     if rel_ids:
         rel_pick = st.selectbox(
-            "OSM relation id",
+            t("ui.p3.phase3_workspace_map.osm_relation_id"),
             options=rel_ids,
             index=rel_ids.index(ss.get("p3.osm_relation_id")) if ss.get("p3.osm_relation_id") in rel_ids else 0,
             key=f"{key}.rel_pick",
         )
         ss["p3.osm_relation_id"] = int(rel_pick)
     else:
-        st.caption("No relation candidates available.")
+        st.caption(t("ui.p3.phase3_workspace_map.no_relation_candidates_available"))
 
     if seq_ids:
         seq_pick = st.selectbox(
@@ -174,7 +176,7 @@ def render_phase3_workspace_map(*, route_id: str, key: str = "p3_workspace") -> 
         )
         ss["p3.active_sequence_candidate_id"] = seq_pick
     else:
-        st.caption("No stop sequence candidates available.")
+        st.caption(t("ui.p3.phase3_workspace_map.no_stop_sequence_candidates_available"))
 
     if geom_ids:
         geom_pick = st.selectbox(
@@ -186,4 +188,4 @@ def render_phase3_workspace_map(*, route_id: str, key: str = "p3_workspace") -> 
         ss["p3.active_geometry_candidate_id"] = geom_pick
         ss["p3.geometry_candidate_id"] = geom_pick
     else:
-        st.caption("No geometry candidates available.")
+        st.caption(t("ui.p3.phase3_workspace_map.no_geometry_candidates_available"))

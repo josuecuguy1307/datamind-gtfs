@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import subprocess
 import unittest
 import uuid
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from datamind_console.phases.phase3_routes.client import Phase3Client
@@ -970,6 +971,9 @@ class ManualSequenceClientTests(unittest.TestCase):
                     "sequence_approved_by": "sequence-op",
                     "service_route_id": str(service_route_id),
                     "direction_id": 1,
+                    # Skill 11 §7: province must be explicit; approve_geometry
+                    # refuses NULL instead of assuming 'sample_region'.
+                    "province": "sample_region",
                 },
                 {"stop_node_ids": [stop_a, stop_b]},
             ]
@@ -990,27 +994,62 @@ class ManualSequenceClientTests(unittest.TestCase):
             client,
             "_resolve_linked_coverage_gaps_for_route",
             return_value=None,
-        ):
+        ), patch(
+            # route_prod is written through the canonical persistence wrapper
+            # (it used to be a direct INSERT INTO route_prod.routes here).
+            "datamind_console.phases.phase3_routes.client.write_to_route_prod",
+            return_value=SimpleNamespace(success=True, error=None),
+        ) as write_prod:
             client.approve_geometry(
                 route_id=route_id,
                 geometry_candidate_id=geometry_candidate_id,
                 approved_by="tester",
             )
 
-        prod_upserts = [
-            (sql, params)
-            for sql, params in cursor.executed
-            if "INSERT INTO route_prod.routes" in str(sql)
-        ]
-        self.assertEqual(len(prod_upserts), 1)
-        prod_sql, prod_params = prod_upserts[0]
-        self.assertIn("chosen_stop_sequence_candidate_id", str(prod_sql))
-        self.assertIn("canonical_sequence_ready", str(prod_sql))
-        self.assertEqual(str(prod_params[2]), str(approved_sequence_candidate_id))
-        self.assertEqual(str(prod_params[3]), "2026-03-07T12:00:00Z")
-        self.assertEqual(str(prod_params[4]), "sequence-op")
-        self.assertEqual(str(prod_params[5]), str(service_route_id))
-        self.assertEqual(int(prod_params[6]), 1)
+        self.assertEqual(write_prod.call_count, 1)
+        kwargs = write_prod.call_args.kwargs
+        data = kwargs["route_data"]
+        self.assertEqual(data["chosen_stop_sequence_candidate_id"], str(approved_sequence_candidate_id))
+        self.assertIs(data["canonical_sequence_ready"], True)
+        self.assertEqual(str(data["sequence_approved_at"]), "2026-03-07T12:00:00Z")
+        self.assertEqual(data["sequence_approved_by"], "sequence-op")
+        self.assertEqual(str(data["service_route_id"]), str(service_route_id))
+        self.assertEqual(int(data["direction_id"]), 1)
+        self.assertEqual(data["province"], "sample_region")
+        self.assertEqual(kwargs["stops"], [stop_a, stop_b])
+
+    def test_approve_geometry_refuses_route_without_province(self) -> None:
+        # Skill 11 §7: no silent 'sample_region' default. Intended behavior.
+        client = self._client()
+        route_id = uuid.uuid4()
+        geometry_candidate_id = uuid.uuid4()
+        seq_id = uuid.uuid4()
+        cursor = _FakeCursor(
+            fetchone_rows=[
+                {
+                    "geometry_candidate_id": str(geometry_candidate_id),
+                    "geom": "LINESTRING(-78.4 -0.1,-78.45 -0.12)",
+                    "stop_sequence_candidate_id": str(seq_id),
+                    "route_id": str(route_id),
+                },
+                {
+                    "chosen_stop_sequence_candidate_id": str(seq_id),
+                    "approval_status": "approved",
+                    "province": None,
+                },
+            ]
+        )
+        fake_db_conn, fake_db_cursor = _fake_db_context(cursor)
+        with patch.object(client, "_ensure_sequence_resolution_schema", lambda: None), patch(
+            "datamind_console.phases.phase3_routes.client.db_conn", fake_db_conn,
+        ), patch(
+            "datamind_console.phases.phase3_routes.client.db_cursor", fake_db_cursor,
+        ), patch(
+            "datamind_console.phases.phase3_routes.client.write_to_route_prod",
+        ) as write_prod:
+            with self.assertRaisesRegex(RuntimeError, "province is NULL"):
+                client.approve_geometry(route_id=route_id, geometry_candidate_id=geometry_candidate_id, approved_by="tester")
+        write_prod.assert_not_called()
 
     def test_approve_geometry_rejects_noncanonical_geometry_candidate(self) -> None:
         client = self._client()

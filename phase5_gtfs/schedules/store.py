@@ -13,8 +13,30 @@ def run_migration(migration_path: Path) -> None:
             cur.execute(sql)
 
 
+def migration_version_key(path: Path) -> tuple[int, ...]:
+    """Numeric version of ``V5_<n>__name.sql`` (so V5_10 sorts after V5_9).
+
+    Plain ``sorted()`` compared names as strings and applied V5_10/V5_11
+    before V5_2.
+    """
+    head = path.name.split("__", 1)[0]          # "V5_11"
+    parts = head.lstrip("Vv").split("_")
+    out: list[int] = []
+    for part in parts:
+        try:
+            out.append(int(part))
+        except ValueError:
+            out.append(0)
+    return tuple(out)
+
+
+def list_migrations(migrations_dir: Path) -> list[Path]:
+    return sorted(migrations_dir.glob("V5_*.sql"), key=migration_version_key)
+
+
 def run_all_migrations(migrations_dir: Path) -> None:
-    for path in sorted(migrations_dir.glob("V5_*.sql")):
+    """Apply every V5 migration in numeric order (explicit admin action only)."""
+    for path in list_migrations(migrations_dir):
         run_migration(path)
 
 

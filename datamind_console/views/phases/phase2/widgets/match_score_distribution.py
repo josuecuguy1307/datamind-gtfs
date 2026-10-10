@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 
 import pandas as pd
 import streamlit as st
+from datamind_console.i18n import t
 
 
 def render_match_score_distribution(
@@ -22,25 +23,25 @@ def render_match_score_distribution(
       - Data you can plot from returned rows:
           confidence   (alias candidate score)
     """
-    st.subheader("Match score distribution (alias confidence)")
+    st.subheader(t("ui.p124.match_score_distribution.match_score_distribution_alias_confidence"))
 
     if not place_set_id:
-        st.info("Select a place_set_id first.")
+        st.info(t("ui.p124.match_score_distribution.select_place_set_id_first"))
         return
 
     try:
         rows: List[Dict[str, Any]] = client.get_alias_confidence_distribution(place_set_id)
     except Exception as e:
-        st.error(f"Failed to load confidence distribution: {e}")
+        st.error(t("ui.p124.match_score_distribution.failed_load_confidence_distribution_e", e=(e)))
         return
 
     if not rows:
-        st.warning("No confidence scores found for this place_set_id.")
+        st.warning(t("ui.p124.match_score_distribution.no_confidence_scores_found_this_place"))
         return
 
     df = pd.DataFrame(rows)
     if "confidence" not in df.columns:
-        st.error("Client returned rows without 'confidence'.")
+        st.error(t("ui.p124.match_score_distribution.client_returned_rows_without_confidence"))
         return
 
     # Normalize to numeric + drop nulls
@@ -48,23 +49,23 @@ def render_match_score_distribution(
     df = df.dropna(subset=["confidence"])
 
     if df.empty:
-        st.warning("All confidence values were null/unparseable.")
+        st.warning(t("ui.p124.match_score_distribution.all_confidence_values_were_null_unparseable"))
         return
 
     # Small stats header
     c = df["confidence"]
     st.caption(
-        f"n={len(c)} | min={c.min():.4f} | p50={c.median():.4f} | mean={c.mean():.4f} | p90={c.quantile(0.9):.4f} | max={c.max():.4f}"
+        t("ui.p124.match_score_distribution.n_n_c_min_min_p50", n_c=(len(c)), min=format((c.min()), '.4f'), median=format((c.median()), '.4f'), mean=format((c.mean()), '.4f'), quantile=format((c.quantile(0.9)), '.4f'), max=format((c.max()), '.4f'))
     )
 
     # Controls (UI only)
     cols = st.columns([1, 1, 1])
     with cols[0]:
-        bins = st.number_input("Bins", min_value=5, max_value=200, value=int(bins), step=5, key=f"{key_prefix}:bins")
+        bins = st.number_input(t("ui.p124.match_score_distribution.bins"), min_value=5, max_value=200, value=int(bins), step=5, key=f"{key_prefix}:bins")
     with cols[1]:
-        clamp01 = st.checkbox("Clamp to [0,1]", value=False, key=f"{key_prefix}:clamp")
+        clamp01 = st.checkbox(t("ui.p124.match_score_distribution.clamp_0_1"), value=False, key=f"{key_prefix}:clamp")
     with cols[2]:
-        show_table = st.checkbox("Show raw values", value=False, key=f"{key_prefix}:table")
+        show_table = st.checkbox(t("ui.p124.match_score_distribution.show_raw_values"), value=False, key=f"{key_prefix}:table")
 
     data = c.copy()
     if clamp01:

@@ -28,6 +28,13 @@ from typing import Any, Dict, List, Optional
 _LOG = logging.getLogger(__name__)
 
 
+def catalog_mirror_dir() -> Path:
+    """Desktop mirror for catalog outputs: ``PHASE3_CATALOG_MIRROR_DIR`` or ~/Desktop."""
+    from datamind_console.common.paths import phase3_catalog_mirror_dir
+
+    return phase3_catalog_mirror_dir()
+
+
 def _utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -85,7 +92,7 @@ def run_constructor_batch(
 
     out_dir = Path(output_dir or "phase3_route_catalog")
     out_dir.mkdir(parents=True, exist_ok=True)
-    mirror_dir = Path.home() / "phase3_route_catalog"
+    mirror_dir = catalog_mirror_dir()
 
     advisor = ConstructorLLMAdvisor(mode=llm_mode)
 
@@ -290,7 +297,7 @@ def run_validation_suite(
     )
 
     out_dir = Path(output_dir or "phase3_route_catalog")
-    mirror_dir = Path.home() / "phase3_route_catalog"
+    mirror_dir = catalog_mirror_dir()
 
     results: List[Dict[str, Any]] = []
 
@@ -573,7 +580,7 @@ def run_sequence_discovery_batch(
 
     out_dir = Path(output_dir or "phase3_route_catalog")
     out_dir.mkdir(parents=True, exist_ok=True)
-    mirror_dir = Path.home() / "phase3_route_catalog"
+    mirror_dir = catalog_mirror_dir()
 
     advisor = ConstructorLLMAdvisor(mode=llm_mode)
 
@@ -732,7 +739,7 @@ def write_documentation(
 ) -> List[str]:
     """Write documentation artifacts."""
     out_dir = Path(output_dir or "phase3_route_catalog")
-    mirror_dir = Path.home() / "phase3_route_catalog"
+    mirror_dir = catalog_mirror_dir()
     files_written: List[str] = []
 
     docs = {

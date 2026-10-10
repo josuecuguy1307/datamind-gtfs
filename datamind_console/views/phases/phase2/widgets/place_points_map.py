@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pydeck as pdk
 import streamlit as st
+from datamind_console.i18n import t
 
 
 def _center_from_points(points: List[Dict[str, Any]]) -> Tuple[float, float]:
@@ -34,7 +35,7 @@ def _to_df(points: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def _deck_scatter(points: List[Dict[str, Any]], *, tooltip_html: str, height: int = 520) -> None:
     pts = _to_df(points)
     if not pts:
-        st.info("No points to render.")
+        st.info(t("ui.p124.place_points_map.no_points_render"))
         return
 
     c_lat, c_lon = _center_from_points(pts)
@@ -99,44 +100,33 @@ def render_place_points_map(
     limit = int(limit)
 
     if mode not in ("work", "prod"):
-        st.error("place_points_map: mode must be 'work' or 'prod'.")
+        st.error(t("ui.p124.place_points_map.place_points_map_mode_must_be"))
         return []
 
     if mode == "work":
-        st.subheader("Place points map (work)")
+        st.subheader(t("ui.p124.place_points_map.place_points_map_work"))
         if not place_set_id:
-            st.info("Select a place_set_id to render work points.")
+            st.info(t("ui.p124.place_points_map.select_place_set_id_render_work"))
             return []
 
         try:
             points = client.get_place_set_points(place_set_id, limit=limit)
         except Exception as e:
-            st.error(f"Failed to load work points: {e}")
+            st.error(t("ui.p124.place_points_map.failed_load_work_points_e", e=(e)))
             return []
 
         # Tooltip ONLY using fields guaranteed by Phase2Client query
-        tooltip = """
-        <div style="max-width:320px">
-          <div><b>{proposed_canonical_name}</b></div>
-          <div>place_candidate_id: {place_candidate_id}</div>
-          <div>type: {proposed_place_type}</div>
-          <div>node_id: {node_id}</div>
-          <div>node_type: {node_type}</div>
-          <div>confidence: {confidence}</div>
-          <div>source: {mapping_source}</div>
-          <div>lat,lon: {lat}, {lon}</div>
-        </div>
-        """
+        tooltip = t("p2.map.tooltip_work")
 
         _deck_scatter(points, tooltip_html=tooltip, height=height)
 
-        with st.expander("Points table (work)", expanded=False):
+        with st.expander(t("ui.p124.place_points_map.points_table_work"), expanded=False):
             st.dataframe(points, use_container_width=True)
 
         return points
 
     # prod
-    st.subheader("Place points map (prod)")
+    st.subheader(t("ui.p124.place_points_map.place_points_map_prod"))
 
     try:
         points = client.get_prod_place_points(place_id=place_id, limit=limit)
@@ -144,25 +134,14 @@ def render_place_points_map(
         st.info(str(e))
         return []
     except Exception as e:
-        st.error(f"Failed to load prod points: {e}")
+        st.error(t("ui.p124.place_points_map.failed_load_prod_points_e", e=(e)))
         return []
 
-    tooltip = """
-    <div style="max-width:320px">
-      <div><b>{canonical_name}</b></div>
-      <div>place_id: {place_id}</div>
-      <div>type: {place_type}</div>
-      <div>node_id: {node_id}</div>
-      <div>node_type: {node_type}</div>
-      <div>confidence: {confidence}</div>
-      <div>source: {mapping_source}</div>
-      <div>lat,lon: {lat}, {lon}</div>
-    </div>
-    """
+    tooltip = t("p2.map.tooltip_prod")
 
     _deck_scatter(points, tooltip_html=tooltip, height=height)
 
-    with st.expander("Points table (prod)", expanded=False):
+    with st.expander(t("ui.p124.place_points_map.points_table_prod"), expanded=False):
         st.dataframe(points, use_container_width=True)
 
     return points

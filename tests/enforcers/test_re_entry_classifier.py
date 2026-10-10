@@ -17,6 +17,7 @@ from hades.enforcers.re_entry_classifier import (
     OSM_RELATION_CLEAN,
     OSM_RELATION_SEVERE,
     STRUCTURAL_REPAIR,
+    DEEP_RESEARCH_LEGACY,
     UNCLASSIFIED,
     classify,
 )
@@ -147,14 +148,16 @@ def test_constructor_canonical_maps_to_constructor_canonical_legacy():
 # Arm 4 — unmapped source types fall through to unclassified.
 # ---------------------------------------------------------------------------
 
-def test_deep_research_override_is_unclassified():
+def test_deep_research_override_maps_to_deep_research_legacy():
+    # Migration 043: 55 deep_research_override routes were stuck as
+    # 'unclassified'; they now get their own class at priority 35.
     result = classify(
         source_type="deep_research_override",
         geometry_report=_geom_report("minor"),
         coverage_report=_cov_report("good"),
     )
-    assert result.classification == UNCLASSIFIED
-    assert result.priority == 99
+    assert result.classification == DEEP_RESEARCH_LEGACY
+    assert result.priority == 35
     assert "deep_research_override" in result.priority_reason
 
 

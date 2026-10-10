@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional
 import streamlit as st
 
 from datamind_console.services.geo_api_service import GeoApiService
+from datamind_console.i18n import t
+from datamind_console.ui.components.page import page_header
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -42,51 +44,51 @@ def _response_ok(resp: Any) -> bool:
 
 def _contract_check(endpoint: str, resp: Any) -> Dict[str, Any]:
     if not isinstance(resp, dict):
-        return {"ok": False, "reason": "Response is not a JSON object"}
+        return {"ok": False, "reason": t("geoapi.check.not_json_object")}
     if "error" in resp:
         err = resp.get("error") if isinstance(resp.get("error"), dict) else {}
-        return {"ok": False, "reason": f"{err.get('code') or 'ERROR'}: {err.get('message') or 'Request failed'}"}
+        return {"ok": False, "reason": f"{err.get('code') or 'ERROR'}: {err.get('message') or t('geoapi.request_failed')}"}
 
     required_root = {"query", "endpoint", "timings_ms", "candidates"}
     missing = [k for k in required_root if k not in resp]
     if missing:
-        return {"ok": False, "reason": f"Missing root keys: {', '.join(missing)}"}
+        return {"ok": False, "reason": t("geoapi.check.missing_root_keys", keys=', '.join(missing))}
 
     timings = resp.get("timings_ms")
     if not isinstance(timings, dict) or "total_ms" not in timings:
-        return {"ok": False, "reason": "Missing timings_ms.total_ms"}
+        return {"ok": False, "reason": t("geoapi.check.missing_field", field="timings_ms.total_ms")}
 
     candidates = resp.get("candidates")
     if not isinstance(candidates, list):
-        return {"ok": False, "reason": "candidates must be a list"}
+        return {"ok": False, "reason": t("geoapi.check.candidates_not_list")}
 
     if candidates:
         first = candidates[0] if isinstance(candidates[0], dict) else {}
         cand_keys = {"id", "name", "entity_type", "lat", "lon", "score", "score_parts", "source"}
         missing_cand = [k for k in cand_keys if k not in first]
         if missing_cand:
-            return {"ok": False, "reason": f"Missing candidate keys: {', '.join(missing_cand)}"}
+            return {"ok": False, "reason": t("geoapi.check.missing_candidate_keys", keys=', '.join(missing_cand))}
         parts = first.get("score_parts")
         if not isinstance(parts, dict):
-            return {"ok": False, "reason": "score_parts must be an object"}
+            return {"ok": False, "reason": t("geoapi.check.score_parts_not_object")}
         for k in ("semantic", "lexical", "prior"):
             if k not in parts:
-                return {"ok": False, "reason": f"Missing score_parts.{k}"}
+                return {"ok": False, "reason": t("geoapi.check.missing_field", field=f"score_parts.{k}")}
 
     if str(resp.get("endpoint") or "") != endpoint:
-        return {"ok": False, "reason": f"Endpoint mismatch. Expected '{endpoint}' got '{resp.get('endpoint')}'"}
+        return {"ok": False, "reason": t("geoapi.check.endpoint_mismatch_got", expected=endpoint, got=resp.get('endpoint'))}
 
-    return {"ok": True, "reason": "Contract OK"}
+    return {"ok": True, "reason": t("geoapi.check.contract_ok")}
 
 
 def _health_check(resp: Any) -> Dict[str, Any]:
     if not isinstance(resp, dict):
-        return {"ok": False, "reason": "Health response is not JSON"}
+        return {"ok": False, "reason": t("geoapi.check.health_not_json")}
     if "error" in resp:
         err = resp.get("error") if isinstance(resp.get("error"), dict) else {}
-        return {"ok": False, "reason": f"{err.get('code') or 'ERROR'}: {err.get('message') or 'Health failed'}"}
+        return {"ok": False, "reason": f"{err.get('code') or 'ERROR'}: {err.get('message') or t('geoapi.check.health_failed')}"}
     if "status" not in resp:
-        return {"ok": False, "reason": "Missing health status field"}
+        return {"ok": False, "reason": t("geoapi.check.missing_health_status")}
     return {"ok": True, "reason": str(resp.get("status") or "unknown")}
 
 
@@ -128,8 +130,7 @@ def render_geo_api_production_view(*, analytics: Any = None, audit: Any = None, 
     ss = st.session_state
     ss.setdefault("geo.prod.results", {})
 
-    st.title("Geo API Production")
-    st.caption("Production readiness checks, contract validation, and backend integration checklist.")
+    page_header(t("page.geo_api_production.title"), t("page.geo_api_production.subtitle"), eyebrow=t("page.integration.eyebrow"))
 
     require_auth = _env_bool("GEO_API_REQUIRE_AUTH", False)
     rate_limit = _env_int("GEO_API_RATE_LIMIT_PER_MIN", 0)
@@ -137,19 +138,19 @@ def render_geo_api_production_view(*, analytics: Any = None, audit: Any = None, 
     keys_count = _configured_api_keys_count()
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("HTTP base", service.http_base_url)
-    c2.metric("Auth required", "yes" if require_auth else "no")
-    c3.metric("API keys configured", str(keys_count))
-    c4.metric("Rate limit / min", str(rate_limit))
+    c1.metric(t("ui.misc.geo_api_production.http_base"), service.http_base_url)
+    c2.metric(t("ui.misc.geo_api_production.auth_required"), "yes" if require_auth else "no")
+    c3.metric(t("ui.misc.geo_api_production.api_keys_configured"), str(keys_count))
+    c4.metric(t("ui.misc.geo_api_production.rate_limit_min"), str(rate_limit))
 
     entered_key = st.text_input(
-        "API key for validation (optional if auth disabled)",
+        t("ui.misc.geo_api_production.api_key_validation_optional_if_auth"),
         type="password",
         key="geo.prod.api_key",
-        help="Used only for readiness checks from this UI.",
+        help=t("ui.misc.geo_api_production.used_only_readiness_checks_from_this"),
     )
 
-    if st.button("Run Production Readiness Check", type="primary", use_container_width=True):
+    if st.button(t("ui.misc.geo_api_production.run_production_readiness_check"), type="primary", use_container_width=True):
         api_key = (entered_key or "").strip() or None
         results: Dict[str, Any] = {}
         results["local_health"] = service.local_health()
@@ -161,7 +162,7 @@ def render_geo_api_production_view(*, analytics: Any = None, audit: Any = None, 
 
     results = ss.get("geo.prod.results") or {}
     if not results:
-        st.info("Run readiness checks to validate production API contract and connectivity.")
+        st.info(t("ui.misc.geo_api_production.run_readiness_checks_validate_production_api"))
         return
 
     local_h = _health_check(results.get("local_health"))
@@ -170,47 +171,45 @@ def render_geo_api_production_view(*, analytics: Any = None, audit: Any = None, 
     chk_auto = _contract_check("autocomplete", results.get("autocomplete_http"))
     chk_rev = _contract_check("reverse", results.get("reverse_http"))
 
-    st.markdown("#### Readiness Status")
+    st.markdown(t("ui.misc.geo_api_production.readiness_status"))
     r1, r2 = st.columns(2)
     with r1:
-        _render_status_card("Local health", local_h)
-        _render_status_card("HTTP health", http_h)
-        _render_status_card("HTTP geocode contract", chk_geo)
+        _render_status_card(t("geoapi.card.local_health"), local_h)
+        _render_status_card(t("geoapi.card.http_health"), http_h)
+        _render_status_card(t("geoapi.card.geocode_contract"), chk_geo)
     with r2:
-        _render_status_card("HTTP autocomplete contract", chk_auto)
-        _render_status_card("HTTP reverse contract", chk_rev)
+        _render_status_card(t("geoapi.card.autocomplete_contract"), chk_auto)
+        _render_status_card(t("geoapi.card.reverse_contract"), chk_rev)
 
     auth_gate_ok = True
     if require_auth:
         if keys_count <= 0:
             auth_gate_ok = False
-            st.error("Auth is required but no API keys are configured in env.")
+            st.error(t("ui.misc.geo_api_production.auth_required_but_no_api_keys"))
         elif not entered_key:
             auth_gate_ok = False
-            st.warning("Auth is required. Provide an API key in this screen to validate production calls.")
+            st.warning(t("ui.misc.geo_api_production.auth_required_provide_api_key_this"))
 
     transport_check = _detect_transport_auth_support()
-    st.markdown("#### Backend Compatibility")
+    st.markdown(t("ui.misc.geo_api_production.backend_compatibility"))
     if not transport_check.get("found"):
-        st.warning("Could not locate gtfs_app backend file to verify auth-header support.")
+        st.warning(t("ui.misc.geo_api_production.could_not_locate_gtfs_app_backend"))
     else:
-        st.caption(f"Detected file: `{transport_check.get('path')}`")
+        st.caption(t("ui.misc.geo_api_production.detected_file_path", path=(transport_check.get('path'))))
         if require_auth and not transport_check.get("supports_auth_header"):
             st.error(
-                "gtfs_app geocoder client does not appear to send Authorization headers. "
-                "If Geo API auth stays required, backend integration will fail until backend adds auth header support."
+                t("ui.misc.geo_api_production.gtfs_app_geocoder_client_does_not")
             )
         else:
-            st.success("gtfs_app compatibility check passed for current auth mode.")
+            st.success(t("ui.misc.geo_api_production.gtfs_app_compatibility_check_passed_current"))
         if transport_check.get("uses_legacy_geocode_fallback"):
             st.warning(
-                "gtfs_app still references legacy geocoder fallback path. "
-                "For production single-API mode, keep only `/api/geo/geocode`."
+                t("ui.misc.geo_api_production.gtfs_app_still_references_legacy_geocoder")
             )
         else:
-            st.success("gtfs_app uses single geocoder API path (`/api/geo/geocode`).")
+            st.success(t("ui.misc.geo_api_production.gtfs_app_uses_single_geocoder_api"))
 
-    st.markdown("#### Backend Env Snippet")
+    st.markdown(t("ui.misc.geo_api_production.backend_env_snippet"))
     st.code(
         "\n".join(
             [
@@ -223,7 +222,7 @@ def render_geo_api_production_view(*, analytics: Any = None, audit: Any = None, 
     )
 
     header_part = '-H "Authorization: Bearer <API_KEY>"' if require_auth else ""
-    st.markdown("#### Curl Smoke Tests")
+    st.markdown(t("ui.misc.geo_api_production.curl_smoke_tests"))
     st.code(
         "\n".join(
             [
@@ -236,11 +235,11 @@ def render_geo_api_production_view(*, analytics: Any = None, audit: Any = None, 
         language="bash",
     )
 
-    st.markdown("#### Raw Check Payloads")
-    with st.expander("Show raw readiness responses", expanded=False):
+    st.markdown(t("ui.misc.geo_api_production.raw_check_payloads"))
+    with st.expander(t("ui.misc.geo_api_production.show_raw_readiness_responses"), expanded=False):
         st.json(results)
 
     if all(x.get("ok") for x in (local_h, http_h, chk_geo, chk_auto, chk_rev)) and auth_gate_ok:
-        st.success("Geo API production readiness checks passed.")
+        st.success(t("ui.misc.geo_api_production.geo_api_production_readiness_checks_passed"))
     else:
-        st.warning("Geo API production readiness checks did not fully pass. Resolve failing checks before rollout.")
+        st.warning(t("ui.misc.geo_api_production.geo_api_production_readiness_checks_did"))

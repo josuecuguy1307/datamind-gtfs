@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 import pydeck as pdk
 import streamlit as st
+from datamind_console.i18n import t
 
 
 def _center(points: List[Dict[str, Any]]) -> Tuple[float, float]:
@@ -20,15 +21,15 @@ def render_evidence_coverage_map(
     limit: int = 20000,
     key_prefix: str = "p2",
 ) -> None:
-    st.subheader("Evidence coverage map (work)")
+    st.subheader(t("ui.p124.evidence_coverage_kpis.evidence_coverage_map_work"))
 
     if not place_set_id:
-        st.info("Select a place_set_id.")
+        st.info(t("ui.p124.evidence_coverage_kpis.select_place_set_id"))
         return
 
     points = client.get_place_set_points(place_set_id, limit=int(limit)) or []
     if not points:
-        st.info("No points for this set.")
+        st.info(t("ui.p124.evidence_coverage_kpis.no_points_this_set"))
         return
 
     for r in points:

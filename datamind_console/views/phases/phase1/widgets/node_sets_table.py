@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 
 from phases.phase1_nodes.client import _get_phase1_client
+from datamind_console.i18n import t
 
 
 # ---------------------------
@@ -37,11 +38,11 @@ def render_node_sets_table(
         st.info(str(e))
         return None
     except Exception as e:
-        st.error(f"Failed to load node sets: {e}")
+        st.error(t("ui.p124.node_sets_table.failed_load_node_sets_e", e=(e)))
         return None
 
     if not rows:
-        st.info("No node sets found.")
+        st.info(t("ui.p124.node_sets_table.no_node_sets_found"))
         return None
 
     # Normalize for DataFrame
@@ -70,8 +71,6 @@ def render_node_sets_table(
     # Selection column
     df.insert(0, "select", False)
 
-    st.markdown("### Node sets")
-
     edited = st.data_editor(
         df,
         hide_index=True,
@@ -79,8 +78,8 @@ def render_node_sets_table(
         key=key,
         column_config={
             "select": st.column_config.CheckboxColumn(
-                "Select",
-                help="Choose a node set",
+                t("ui.p124.node_sets_table.select"),
+                help=t("ui.p124.node_sets_table.choose_node_set"),
                 default=False,
             ),
             "node_set_id": st.column_config.TextColumn(
@@ -88,15 +87,15 @@ def render_node_sets_table(
                 disabled=True,
             ),
             "place_name": st.column_config.TextColumn(
-                "place",
+                t("ui.p124.node_sets_table.place"),
                 disabled=True,
             ),
             "target_group": st.column_config.TextColumn(
-                "group",
+                t("ui.p124.node_sets_table.group"),
                 disabled=True,
             ),
             "extraction_action": st.column_config.TextColumn(
-                "action",
+                t("ui.p124.node_sets_table.action"),
                 disabled=True,
             ),
         },
@@ -106,33 +105,33 @@ def render_node_sets_table(
     
 
     selected_ids = [str(x) for x in edited.loc[edited["select"] == True, "node_set_id"].tolist() if x]
-    st.caption(f"Selected rows: {len(selected_ids)}")
+    st.caption(t("ui.p124.node_sets_table.selected_rows_n_selected_ids", n_selected_ids=(len(selected_ids))))
 
-    with st.expander("Set cleanup", expanded=False):
-        st.caption("Delete selected node sets from `node_work`. Optionally remove linked `node_prod` nodes too.")
+    with st.expander(t("ui.p124.node_sets_table.set_cleanup"), expanded=False):
+        st.caption(t("ui.p124.node_sets_table.delete_selected_node_sets_from_node"))
         c1, c2 = st.columns([1, 1])
         with c1:
             delete_prod_nodes = st.checkbox(
-                "Also delete node_prod nodes from selected sets",
+                t("ui.p124.node_sets_table.also_delete_node_prod_nodes_from"),
                 value=False,
                 key=f"{key}.del_prod",
             )
         with c2:
             confirm_delete = st.checkbox(
-                "I confirm delete selected node sets",
+                t("ui.p124.node_sets_table.i_confirm_delete_selected_node_sets"),
                 value=False,
                 key=f"{key}.del_confirm",
             )
 
         if st.button(
-            "Delete selected set(s)",
+            t("ui.p124.node_sets_table.delete_selected_set_s"),
             type="secondary",
             use_container_width=True,
             key=f"{key}.del_btn",
             disabled=(len(selected_ids) == 0),
         ):
             if not confirm_delete:
-                st.error("Confirm deletion first.")
+                st.error(t("ui.p124.node_sets_table.confirm_deletion_first"))
             else:
                 deleted = 0
                 failed: List[Dict[str, Any]] = []
@@ -148,17 +147,17 @@ def render_node_sets_table(
                 st.session_state.pop(key, None)
 
                 if failed:
-                    st.warning(f"Deleted {deleted} set(s). Failed: {len(failed)}")
+                    st.warning(t("ui.p124.node_sets_table.deleted_deleted_set_s_failed_n", deleted=(deleted), n_failed=(len(failed))))
                     st.json(failed)
                 else:
-                    st.success(f"Deleted {deleted} set(s).")
+                    st.success(t("ui.p124.node_sets_table.deleted_deleted_set_s", deleted=(deleted)))
                 st.rerun()
 
     if not selected_ids:
         return None
 
     if len(selected_ids) > 1:
-        st.warning("Select only one node set to open. (You can still delete multiple.)")
+        st.warning(t("ui.p124.node_sets_table.select_only_one_node_set_open"))
         return None
 
     return str(selected_ids[0])

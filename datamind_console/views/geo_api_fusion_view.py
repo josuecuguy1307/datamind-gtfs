@@ -13,6 +13,8 @@ except Exception:  # pragma: no cover
     requests = None
 
 from datamind_console.services.geo_api_service import GeoApiService
+from datamind_console.i18n import t
+from datamind_console.ui.components.page import page_header
 
 
 def _auth_headers(api_key: Optional[str]) -> dict[str, str]:
@@ -79,26 +81,26 @@ def _http_get(
 
 def _check_geo_contract(endpoint: str, payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
-        return {"ok": False, "reason": "Payload is not JSON object"}
+        return {"ok": False, "reason": t("geoapi.check.not_json_object")}
     if "error" in payload:
         err = payload.get("error") if isinstance(payload.get("error"), dict) else {}
-        return {"ok": False, "reason": f"{err.get('code') or 'ERROR'}: {err.get('message') or 'Request failed'}"}
+        return {"ok": False, "reason": f"{err.get('code') or 'ERROR'}: {err.get('message') or t('geoapi.request_failed')}"}
     root_keys = {"query", "endpoint", "timings_ms", "candidates"}
     missing_root = [k for k in root_keys if k not in payload]
     if missing_root:
-        return {"ok": False, "reason": f"Missing root keys: {', '.join(missing_root)}"}
+        return {"ok": False, "reason": t("geoapi.check.missing_root_keys", keys=', '.join(missing_root))}
     if str(payload.get("endpoint") or "") != endpoint:
-        return {"ok": False, "reason": f"Endpoint mismatch: expected {endpoint}"}
+        return {"ok": False, "reason": t("geoapi.check.endpoint_mismatch", expected=endpoint)}
     candidates = payload.get("candidates")
     if not isinstance(candidates, list):
-        return {"ok": False, "reason": "candidates is not a list"}
+        return {"ok": False, "reason": t("geoapi.check.candidates_not_list")}
     if candidates:
         first = candidates[0] if isinstance(candidates[0], dict) else {}
         cand_keys = {"id", "name", "entity_type", "lat", "lon", "score", "score_parts", "source"}
         missing = [k for k in cand_keys if k not in first]
         if missing:
-            return {"ok": False, "reason": f"Missing candidate keys: {', '.join(missing)}"}
-    return {"ok": True, "reason": "Contract OK"}
+            return {"ok": False, "reason": t("geoapi.check.missing_candidate_keys", keys=', '.join(missing))}
+    return {"ok": True, "reason": t("geoapi.check.contract_ok")}
 
 
 def _status_message(title: str, ok: bool, detail: str) -> None:
@@ -121,20 +123,19 @@ def render_geo_api_fusion_view(*, analytics: Any = None, audit: Any = None, **_)
         or "http://127.0.0.1:3000"
     ).rstrip("/")
 
-    st.title("Geo API Fusion")
-    st.caption("Single geocoder API contract for app + backend (`/api/geo/*`).")
+    page_header(t("page.geo_api_fusion.title"), t("page.geo_api_fusion.subtitle"), eyebrow=t("page.integration.eyebrow"))
 
     c1, c2 = st.columns(2)
-    c1.metric("DataMind Geo API", service.http_base_url)
-    c2.metric("Transport backend", transport_base)
+    c1.metric(t("ui.misc.geo_api_fusion.datamind_geo_api"), service.http_base_url)
+    c2.metric(t("ui.misc.geo_api_fusion.transport_backend"), transport_base)
 
     api_key = st.text_input(
-        "Geo API key (optional; required only if auth is enabled)",
+        t("ui.misc.geo_api_fusion.geo_api_key_optional_required_only"),
         type="password",
         key="geo.fusion.api_key",
     )
 
-    if st.button("Run Fusion Check", type="primary", use_container_width=True):
+    if st.button(t("ui.misc.geo_api_fusion.run_fusion_check"), type="primary", use_container_width=True):
         headers = _auth_headers(api_key)
         ss["geo.fusion.results"] = {
             "datamind_health": service.health_http(api_key=(api_key or None)),
@@ -167,7 +168,7 @@ def render_geo_api_fusion_view(*, analytics: Any = None, audit: Any = None, **_)
 
     results = ss.get("geo.fusion.results") or {}
     if not results:
-        st.info("Run fusion check to validate one-API integration.")
+        st.info(t("ui.misc.geo_api_fusion.run_fusion_check_validate_one_api"))
         return
 
     datamind_health = results.get("datamind_health")
@@ -182,26 +183,26 @@ def render_geo_api_fusion_view(*, analytics: Any = None, audit: Any = None, **_)
     rev_check = _check_geo_contract("reverse", rev.get("payload"))
     legacy_check = _check_geo_contract("geocode", legacy.get("payload"))
 
-    st.markdown("#### Fusion Status")
+    st.markdown(t("ui.misc.geo_api_fusion.fusion_status"))
     s1, s2 = st.columns(2)
     with s1:
         _status_message(
-            "DataMind Geo API health",
+            t("geoapi.card.datamind_health"),
             _response_ok(datamind_health),
-            "reachable" if _response_ok(datamind_health) else str((datamind_health or {}).get("error") or "failed"),
+            t("geoapi.reachable") if _response_ok(datamind_health) else str((datamind_health or {}).get("error") or t("geoapi.failed")),
         )
         _status_message(
             "Transport /api/geo/health",
             bool(transport_health.get("ok")),
-            f"HTTP {transport_health.get('status_code')}" if transport_health.get("status_code") else str(transport_health.get("error") or "failed"),
+            f"HTTP {transport_health.get('status_code')}" if transport_health.get("status_code") else str(transport_health.get("error") or t("geoapi.failed")),
         )
         _status_message("Transport /api/geo/geocode", bool(geo_check.get("ok")), str(geo_check.get("reason")))
     with s2:
         _status_message("Transport /api/geo/autocomplete", bool(auto_check.get("ok")), str(auto_check.get("reason")))
         _status_message("Transport /api/geo/reverse", bool(rev_check.get("ok")), str(rev_check.get("reason")))
-        _status_message("Legacy alias /api/search/geocode", bool(legacy_check.get("ok")), str(legacy_check.get("reason")))
+        _status_message(t("geoapi.card.legacy_alias"), bool(legacy_check.get("ok")), str(legacy_check.get("reason")))
 
-    st.markdown("#### Single API Contract")
+    st.markdown(t("ui.misc.geo_api_fusion.single_api_contract"))
     st.code(
         "\n".join(
             [
@@ -215,7 +216,7 @@ def render_geo_api_fusion_view(*, analytics: Any = None, audit: Any = None, **_)
     )
 
     header_cmd = '-H "Authorization: Bearer <API_KEY>"' if api_key else ""
-    st.markdown("#### Curl")
+    st.markdown(t("ui.misc.geo_api_fusion.curl"))
     st.code(
         "\n".join(
             [
@@ -228,5 +229,5 @@ def render_geo_api_fusion_view(*, analytics: Any = None, audit: Any = None, **_)
         language="bash",
     )
 
-    with st.expander("Raw fusion check payloads", expanded=False):
+    with st.expander(t("ui.misc.geo_api_fusion.raw_fusion_check_payloads"), expanded=False):
         st.json(results)

@@ -12,6 +12,8 @@ from datamind_console.services.gtfs_exports_service import (
     list_artifact_audit,
     list_artifact_notifications,
 )
+from datamind_console.i18n import t
+from datamind_console.ui.components.states import error_state
 
 
 def _actor() -> str:
@@ -75,8 +77,8 @@ def _api_json(method: str, path: str, payload: dict[str, Any] | None = None) -> 
 
 
 def render_gtfs_exports_section() -> None:
-    st.markdown("### GTFS Exports")
-    st.caption("Approval-gated GTFS artifacts. Download is only enabled after approval.")
+    st.markdown(t("ui.misc.gtfs_exports.gtfs_exports"))
+    st.caption(t("ui.misc.gtfs_exports.approval_gated_gtfs_artifacts_download_only"))
 
     try:
         pending = (_api_json("GET", "/api/gtfs/exports?status=pending_approval&limit=200").get("items") or [])
@@ -89,20 +91,19 @@ def render_gtfs_exports_section() -> None:
         if not isinstance(downloaded, list):
             downloaded = []
     except Exception as e:
-        st.error("GTFS exports API unavailable.")
-        st.exception(e)
+        error_state(e, context_key="ui.misc.gtfs_exports.gtfs_exports_api_unavailable", key="gtfs_exports.retry")
         return
 
     k1, k2, k3 = st.columns(3)
-    k1.metric("Pending", len(pending))
-    k2.metric("Approved", len(approved))
-    k3.metric("Downloaded", len(downloaded))
+    k1.metric(t("ui.misc.gtfs_exports.pending"), len(pending))
+    k2.metric(t("ui.misc.gtfs_exports.approved"), len(approved))
+    k3.metric(t("ui.misc.gtfs_exports.downloaded"), len(downloaded))
 
-    tabs = st.tabs(["Pending Approval", "Approved", "Audit + Notifications"])
+    tabs = st.tabs([t("ui.misc.gtfs_exports.pending_approval"), t("ui.misc.gtfs_exports.approved"), t("ui.misc.gtfs_exports.audit_notifications")])
 
     with tabs[0]:
         if not pending:
-            st.info("No pending artifacts.")
+            st.info(t("ui.misc.gtfs_exports.no_pending_artifacts"))
         else:
             st.dataframe(
                 [
@@ -125,10 +126,10 @@ def render_gtfs_exports_section() -> None:
                 title = f"{artifact_id} | {r.get('created_at')}"
                 with st.expander(title, expanded=False):
                     st.json(r.get("summary_json") or {})
-                    notes = st.text_input("notes", value="", key=f"gtfs_exports.pending.notes.{artifact_id}")
+                    notes = st.text_input(t("ui.misc.gtfs_exports.notes"), value="", key=f"gtfs_exports.pending.notes.{artifact_id}")
                     c1, c2 = st.columns(2)
                     with c1:
-                        if st.button("Approve", key=f"gtfs_exports.pending.approve.{artifact_id}", use_container_width=True):
+                        if st.button(t("ui.misc.gtfs_exports.approve"), key=f"gtfs_exports.pending.approve.{artifact_id}", use_container_width=True):
                             try:
                                 out = _api_json(
                                     "POST",
@@ -139,13 +140,13 @@ def render_gtfs_exports_section() -> None:
                                     },
                                 )
                                 if out.get("ok"):
-                                    st.success("Artifact approved.")
+                                    st.success(t("ui.misc.gtfs_exports.artifact_approved"))
                                     st.rerun()
-                                st.error("Artifact not found or no status change.")
+                                st.error(t("ui.misc.gtfs_exports.artifact_not_found_no_status_change"))
                             except Exception as e:
-                                st.error(f"Approve failed: {e}")
+                                st.error(t("ui.misc.gtfs_exports.approve_failed_e", e=(e)))
                     with c2:
-                        if st.button("Reject", key=f"gtfs_exports.pending.reject.{artifact_id}", use_container_width=True):
+                        if st.button(t("ui.misc.gtfs_exports.reject"), key=f"gtfs_exports.pending.reject.{artifact_id}", use_container_width=True):
                             try:
                                 out = _api_json(
                                     "POST",
@@ -156,16 +157,16 @@ def render_gtfs_exports_section() -> None:
                                     },
                                 )
                                 if out.get("ok"):
-                                    st.success("Artifact rejected.")
+                                    st.success(t("ui.misc.gtfs_exports.artifact_rejected"))
                                     st.rerun()
-                                st.error("Artifact not found or no status change.")
+                                st.error(t("ui.misc.gtfs_exports.artifact_not_found_no_status_change"))
                             except Exception as e:
-                                st.error(f"Reject failed: {e}")
+                                st.error(t("ui.misc.gtfs_exports.reject_failed_e", e=(e)))
 
     with tabs[1]:
         rows = approved + downloaded
         if not rows:
-            st.info("No approved/downloaded artifacts.")
+            st.info(t("ui.misc.gtfs_exports.no_approved_downloaded_artifacts"))
         else:
             st.dataframe(
                 [
@@ -186,21 +187,21 @@ def render_gtfs_exports_section() -> None:
             for r in rows:
                 artifact_id = str(r.get("artifact_id") or "")
                 status = str(r.get("status") or "")
-                with st.expander(f"{artifact_id} | status={status}", expanded=False):
-                    st.caption(f"zip_path: `{r.get('zip_path')}`")
+                with st.expander(t("ui.misc.gtfs_exports.artifact_id_status_status", artifact_id=(artifact_id), status=(status)), expanded=False):
+                    st.caption(t("ui.misc.gtfs_exports.zip_path_zip_path", zip_path=(r.get('zip_path'))))
                     st.json(r.get("summary_json") or {})
                     if status in {"approved", "downloaded"}:
-                        if st.button("Fetch download from API", key=f"gtfs_exports.fetch.{artifact_id}", use_container_width=True):
+                        if st.button(t("ui.misc.gtfs_exports.fetch_download_from_api"), key=f"gtfs_exports.fetch.{artifact_id}", use_container_width=True):
                             try:
                                 data = _download_from_api(artifact_id)
                                 st.session_state[f"gtfs_exports.bytes.{artifact_id}"] = data
-                                st.success("Download payload ready.")
+                                st.success(t("ui.misc.gtfs_exports.download_payload_ready"))
                             except Exception as e:
                                 st.error(str(e))
                         data = st.session_state.get(f"gtfs_exports.bytes.{artifact_id}")
                         if isinstance(data, (bytes, bytearray)) and data:
                             st.download_button(
-                                "Download GTFS ZIP",
+                                t("ui.misc.gtfs_exports.download_gtfs_zip"),
                                 data=bytes(data),
                                 file_name=f"{artifact_id}.zip",
                                 mime="application/zip",
@@ -211,15 +212,15 @@ def render_gtfs_exports_section() -> None:
     with tabs[2]:
         all_rows = pending + approved + downloaded
         if not all_rows:
-            st.info("No artifacts to inspect.")
+            st.info(t("ui.misc.gtfs_exports.no_artifacts_inspect"))
             return
         ids = [str(r.get("artifact_id") or "") for r in all_rows if r.get("artifact_id")]
-        pick = st.selectbox("Artifact", options=ids, index=0, key="gtfs_exports.audit.pick")
+        pick = st.selectbox(t("ui.misc.gtfs_exports.artifact"), options=ids, index=0, key="gtfs_exports.audit.pick")
         audit_rows = list_artifact_audit(artifact_id=pick, limit=200)
         notif_rows = list_artifact_notifications(artifact_id=pick, limit=200)
 
-        st.markdown("#### Audit log")
+        st.markdown(t("ui.misc.gtfs_exports.audit_log"))
         st.dataframe(audit_rows or [], use_container_width=True, hide_index=True, height=220)
 
-        st.markdown("#### Notifications")
+        st.markdown(t("ui.misc.gtfs_exports.notifications"))
         st.dataframe(notif_rows or [], use_container_width=True, hide_index=True, height=220)

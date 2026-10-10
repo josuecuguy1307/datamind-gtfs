@@ -1,40 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
-import inspect
-import importlib
+from typing import Any
 import os
 
 import streamlit as st
 
 from datamind_console.phases.phase5_gtfs.client import _get_phase5_client
-
-
-def _call(render_fn: Optional[Callable[..., Any]], *, ctx: Any, **deps: Any) -> Any:
-    if render_fn is None:
-        st.info("Widget/Tab not implemented yet.")
-        return None
-    try:
-        sig = inspect.signature(render_fn)
-        params = sig.parameters
-        if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
-            return render_fn(ctx=ctx, **deps)
-        safe = {k: v for k, v in deps.items() if k in params}
-        if "ctx" in params:
-            return render_fn(ctx=ctx, **safe)
-        return render_fn(**safe)
-    except Exception as e:
-        st.exception(e)
-        return None
-
-
-def _load(module_path: str, fn_name: str) -> Optional[Callable[..., Any]]:
-    try:
-        mod = importlib.import_module(module_path)
-        fn = getattr(mod, fn_name, None)
-        return fn if callable(fn) else None
-    except Exception:
-        return None
+from datamind_console.i18n import t
+from datamind_console.ui.components.states import empty_state
+from datamind_console.views.phases.panels import call_panel as _call, load_panel as _load
 
 
 def _init_state() -> None:
@@ -56,21 +30,17 @@ def render_phase5_view(*, ctx: Any, analytics: Any = None, audit: Any = None, **
     local_only = os.getenv("DATAMIND_LOCAL_ONLY_MODE", "").strip().lower() in {"1", "true", "t", "yes", "y", "on"}
     local_dsn = os.getenv("LOCAL_DB_DSN") or os.getenv("DATAMIND_LOCAL_DB_DSN") or os.getenv("DB_DSN_LOCAL")
     if local_only and not local_dsn:
-        st.subheader("Phase 5 — Schedules + GTFS Publishing")
-        st.info(
-            "Phase 5 data is unavailable: configure LOCAL_DB_DSN for the local-only session. "
-            "Remote database fallbacks are disabled."
-        )
+        empty_state("phase.local_dsn_missing", icon=":material/cloud_off:")
         return
 
     client = _get_phase5_client("v3")
 
-    st.subheader("Phase 5 — Schedules + GTFS Publishing")
-    st.radio(
-        "Phase 5 screen",
+    st.segmented_control(
+        t("phase5.screen.label"),
         options=["Pipeline", "Runtime Lab"],
-        horizontal=True,
+        format_func=lambda v: t("phase5.screen.pipeline") if v == "Pipeline" else t("phase5.screen.runtime_lab"),
         key="phase5.screen",
+        label_visibility="collapsed",
     )
 
     deps = {
@@ -83,44 +53,42 @@ def render_phase5_view(*, ctx: Any, analytics: Any = None, audit: Any = None, **
         w_runtime = _load("views.phases.phase5.widgets.runtime_lab_workspace", "render_runtime_lab_workspace")
         _call(w_runtime, ctx=ctx, **deps)
         return
-    st.markdown("### Widgets")
-
-    st.markdown("#### GTFS Build Context")
+    st.subheader(t("phase5.build_context.title"), anchor=False)
     g1, g2, g3 = st.columns([1.1, 1.3, 1.0])
     with g1:
         new_gtfs_id = st.text_input(
-            "Create gtfs_id (optional custom)",
+            t("ui.p5.phase5.create_gtfs_id_optional_custom"),
             value="",
             key="phase5.gtfs_build.new_id",
-            placeholder="e.g. gtfs-valle-2026-02",
+            placeholder=t("ui.p5.phase5.e_g_gtfs_valle_2026_02"),
         )
     with g2:
         new_gtfs_name = st.text_input(
-            "Build name (optional)",
+            t("ui.p5.phase5.build_name_optional"),
             value="",
             key="phase5.gtfs_build.new_name",
-            placeholder="Valle Feb 2026",
+            placeholder=t("ui.p5.phase5.valle_feb_2026"),
         )
     with g3:
-        if st.button("Create gtfs_id", use_container_width=True, key="phase5.gtfs_build.create"):
+        if st.button(t("ui.p5.phase5.create_gtfs_id"), use_container_width=True, key="phase5.gtfs_build.create"):
             try:
                 row = client.create_gtfs_build(
                     gtfs_id=(new_gtfs_id or "").strip() or None,
                     build_name=(new_gtfs_name or "").strip() or None,
                 )
             except Exception as e:
-                st.error(f"Create gtfs_id failed: {e}")
+                st.error(t("ui.p5.phase5.create_gtfs_id_failed_e", e=(e)))
             else:
                 ss["phase5.gtfs_id"] = str(row.get("gtfs_id") or "")
                 linked = str(row.get("export_run_id") or "")
                 if linked:
                     ss["phase5.export_run_id"] = linked
-                st.success(f"Created gtfs_id: {ss.get('phase5.gtfs_id')}")
+                st.success(t("ui.p5.phase5.created_gtfs_id_phase5_gtfs_id", phase5_gtfs_id=(ss.get('phase5.gtfs_id'))))
 
     try:
         builds = client.list_gtfs_builds(limit=300)
     except Exception as e:
-        st.error(f"Failed to load gtfs_id list: {e}")
+        st.error(t("ui.p5.phase5.failed_load_gtfs_id_list_e", e=(e)))
         builds = []
     try:
         runs = client.list_export_runs(limit=300)
@@ -131,7 +99,7 @@ def render_phase5_view(*, ctx: Any, analytics: Any = None, audit: Any = None, **
         build_ids = [str(r.get("gtfs_id") or "") for r in builds if str(r.get("gtfs_id") or "").strip()]
         current_gid = str(ss.get("phase5.gtfs_id") or "")
         idx = build_ids.index(current_gid) if current_gid in build_ids else 0
-        sel_gid = st.selectbox("Select gtfs_id", build_ids, index=idx, key="phase5.gtfs_build.selected")
+        sel_gid = st.selectbox(t("ui.p5.phase5.select_gtfs_id"), build_ids, index=idx, key="phase5.gtfs_build.selected")
         ss["phase5.gtfs_id"] = str(sel_gid or "")
         selected_row = next((r for r in builds if str(r.get("gtfs_id") or "") == str(sel_gid)), {})
         linked_run = str(selected_row.get("export_run_id") or "")
@@ -139,14 +107,13 @@ def render_phase5_view(*, ctx: Any, analytics: Any = None, audit: Any = None, **
             try:
                 linked_run = str(client.ensure_export_run_for_gtfs_id(str(sel_gid).strip()) or "")
             except Exception as e:
-                st.error(f"Failed to prepare internal build context for gtfs_id `{sel_gid}`: {e}")
+                st.error(t("ui.p5.phase5.failed_prepare_internal_build_context_gtfs", sel_gid=(sel_gid), e=(e)))
         if linked_run:
             ss["phase5.export_run_id"] = linked_run
         st.caption(
-            f"gtfs_id: `{sel_gid}` | internal_build_export_run_id: `{linked_run or '-'}` | "
-            f"status: `{selected_row.get('status') or 'draft'}`"
+            t("ui.p5.phase5.gtfs_id_sel_gid_internal_build", sel_gid=(sel_gid), linked_run=(linked_run or '-'), status=(selected_row.get('status') or 'draft'))
         )
-        st.caption("Uploaded GTFS source export_run_id below is only for reading/importing source data.")
+        st.caption(t("ui.p5.phase5.uploaded_gtfs_source_export_run_id"))
 
         upload_runs = []
         for r in (runs or []):
@@ -163,36 +130,35 @@ def render_phase5_view(*, ctx: Any, analytics: Any = None, audit: Any = None, **
             if current_src not in run_options:
                 current_src = run_options[0]
             pick_run = st.selectbox(
-                "Uploaded GTFS source export_run_id (read-only source for loading)",
+                t("ui.p5.phase5.uploaded_gtfs_source_export_run_id_2"),
                 run_options,
                 index=run_options.index(current_src),
                 key="phase5.gtfs_build.source_run_pick",
             )
             ss["phase5.source_export_run_id"] = str(pick_run or "").strip()
             st.caption(
-                "This source export is used only to preview/load uploaded GTFS content into the selected "
-                "`gtfs_id`. It is not linked or assigned to the GTFS build."
+                t("ui.p5.phase5.this_source_export_used_only_preview")
             )
         else:
             ss["phase5.source_export_run_id"] = ""
-            st.info("No uploaded GTFS source exports found (`source=upload_zip`). Upload a GTFS ZIP first.")
+            st.info(t("ui.p5.phase5.no_uploaded_gtfs_source_exports_found"))
     else:
-        st.info("No gtfs_id yet. Create one to start this workflow.")
+        st.info(t("ui.p5.phase5.no_gtfs_id_yet_create_one"))
 
     st.divider()
 
-    st.markdown("### Steps + Workspace")
+    st.markdown(t("ui.p5.phase5.steps_workspace"))
     if builds:
         step_gtfs_ids = [str(r.get("gtfs_id") or "") for r in builds if str(r.get("gtfs_id") or "").strip()]
         if step_gtfs_ids:
             current_step_gid = str(ss.get("phase5.gtfs_id") or "")
             step_idx = step_gtfs_ids.index(current_step_gid) if current_step_gid in step_gtfs_ids else 0
             picked_step_gid = st.selectbox(
-                "GTFS context for all steps",
+                t("ui.p5.phase5.gtfs_context_all_steps"),
                 step_gtfs_ids,
                 index=step_idx,
                 key="phase5.steps.gtfs_id",
-                help="All Phase 5 steps run using this gtfs_id internal build context.",
+                help=t("ui.p5.phase5.all_phase_5_steps_run_using"),
             )
             if str(picked_step_gid or "").strip() and str(picked_step_gid) != str(ss.get("phase5.gtfs_id") or ""):
                 ss["phase5.gtfs_id"] = str(picked_step_gid)
@@ -201,25 +167,26 @@ def render_phase5_view(*, ctx: Any, analytics: Any = None, audit: Any = None, **
                 if run_id:
                     ss["phase5.export_run_id"] = run_id
             except Exception as e:
-                st.error(f"Failed to prepare step context for gtfs_id `{ss.get('phase5.gtfs_id')}`: {e}")
+                st.error(t("ui.p5.phase5.failed_prepare_step_context_gtfs_id", phase5_gtfs_id=(ss.get('phase5.gtfs_id')), e=(e)))
 
-    st.markdown("#### Run mode")
+    st.markdown(t("ui.p5.phase5.run_mode"))
     st.radio(
-        "Step execution mode",
+        t("ui.p5.phase5.step_execution_mode"),
         options=["One by one", "Bulk (multi-route)"],
+        format_func=lambda v: t("p5.run_mode.bulk") if v == "Bulk (multi-route)" else t("p5.run_mode.one"),
         horizontal=True,
         key="phase5.run_mode",
-        help="Bulk mode makes route-scoped previews default to whole-export and exposes bulk actions where available.",
+        help=t("ui.p5.phase5.bulk_mode_makes_route_scoped_previews"),
     )
 
     left, right = st.columns([1.0, 1.25], gap="large")
 
     with left:
-        st.markdown("#### Route scope selector")
+        st.markdown(t("ui.p5.phase5.route_scope_selector"))
         if str(ss.get("phase5.run_mode") or "") == "Bulk (multi-route)":
-            st.caption("Bulk mode: route selector is optional and used only for per-route tools.")
+            st.caption(t("ui.p5.phase5.bulk_mode_route_selector_optional_used"))
         else:
-            st.caption("Service-route scope is used in Steps 01-03. Direction is required in Step 04/05.")
+            st.caption(t("ui.p5.phase5.service_route_scope_used_steps_01"))
         w_inputs = _load("views.phases.phase5.widgets.route_inputs_table", "render_route_inputs_table")
         picked = _call(w_inputs, ctx=ctx, **deps)
         if isinstance(picked, str) and picked.strip():
@@ -227,7 +194,7 @@ def render_phase5_view(*, ctx: Any, analytics: Any = None, audit: Any = None, **
 
         st.divider()
         tab_00, tab_01s, tab_02r, tab_02bsh, tab_03c, tab_04t, tab_06, tab_07 = st.tabs(
-            ["00 Agencies", "01 Stops", "02 Routes", "02b Shapes", "03 Calendar", "04 Trips+StopTimes", "06 Validate", "07 Package"]
+            [t(f"phase5.step.{k}") for k in ("00", "01", "02", "02b", "03", "04", "06", "07")]
         )
 
         t_00 = _load("views.phases.phase5.tabs.step01_prepare_tab", "render_step01_prepare_tab")

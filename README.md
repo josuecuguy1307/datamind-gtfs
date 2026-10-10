@@ -115,7 +115,6 @@ It is transactional (if something fails, nothing is left half-applied) and refus
 python scripts/load_sample_data.py           # 3 routes · 26 stops · 6 places
 python scripts/load_sample_data.py --remove  # removes only the sample rows
 ```
-
 It is repeatable: running it again replaces the sample without duplicating it.
 
 **5. Start the console**
@@ -127,6 +126,77 @@ streamlit run datamind_console/app.py --server.address 127.0.0.1
 (The console and the scripts read your `.env` automatically.)
 
 Open <http://127.0.0.1:8501>. In local mode there is no login (Streamlit must listen only on `127.0.0.1`, which is what `.streamlit/config.toml` sets). Go to **Sample Region Audit** to see the sample. For a remote deployment with users and sessions, see `ML_DATAMIND_REMOTE_UI` in `.env.example`.
+
+## The console
+
+The console is bilingual (English / Español; switch in the sidebar, kept in the
+`?lang=` URL parameter) and every page has a deep link (`/review`,
+`/phases?phase=3&tab=re_entry`, …).
+
+| Section | Surface | Purpose |
+| --- | --- | --- |
+| Operate | Overview | Operational home built only from real data: pipeline freshness, what needs attention, canonical route counts, recent activity, current feed. Without a database it shows a clear "database unavailable" state and the rest of the console still starts. It never selects a region or work. |
+| Operate | Phases | Phase-specific pipeline workspaces (1 Nodes · 2 Semantics · 3 Routes · 4 Naming · 5 GTFS). Phase 4 includes **Evidence** and **Matching** (below). |
+| Operate | GTFS operations | Validate a GTFS ZIP (structure check, MobilityData validator on demand), publish locally, AWS deploy behind explicit confirmation. See [docs/GTFS_VALIDATION.md](docs/GTFS_VALIDATION.md). |
+| Operate | Revise current GTFS | Review an existing feed. |
+| Review | Review | Read-only overview of every queue waiting for a person, with links to where decisions are made. |
+| Review | Synthetic stops | Stops the pipeline generated to fill coverage gaps: verify or reject each one, on a map. Rejected stops are left out of every GTFS export. |
+| Review | Other proposals | Route proposals outside Re-Entry Review: inspect the evidence and reject with a reason. Nothing is approved automatically. |
+| Audit | Sample Region audit | Read-only inspection of Sample Region route directions, stops and cohorts on the canonical metrics. |
+| Integration | Geo API pages | Geo API, production and fusion views. |
+| System | AI Assistance | Shows a reviewable selected-work context and opens an interactive local Claude Code or Codex terminal only after explicit scope review; it does not authenticate or expand permissions. |
+| System | Settings | Appearance and language; whether the autopilot signs with your own key; in local mode, the configuration in effect (secrets shown only as configured / not set); in remote mode, users and roles. |
+
+**Human review.** The pipeline proposes, a person decides. Every decision on
+those screens names its reviewer and is written together with an audit row in
+`console.phase_decisions`, in one transaction; nothing is decided on page load
+or automatically. See [docs/REVIEW.md](docs/REVIEW.md).
+
+**Phase 4 · Evidence and Matching.** Browse evidence records (OSM relations,
+schedules, operator statements), add one by hand, ask for candidate routes
+scored by a deterministic, explained matcher, and label each candidate
+(correct / partial / not this route). Labels are human decisions with an audit
+row; there is no trained model, so model prediction is not offered. The two
+tables come from migration `V4_8` (schema unit `phase4.evidence_matching`).
+See [docs/PHASE4_EVIDENCE_MATCHING.md](docs/PHASE4_EVIDENCE_MATCHING.md).
+
+Numbers mean one thing everywhere: see [docs/METRICS.md](docs/METRICS.md) and
+[docs/TERMINOLOGY.md](docs/TERMINOLOGY.md). What each capability really does
+today (active, heuristic, experimental, legacy…) is in
+[docs/CURRENT_CAPABILITIES.md](docs/CURRENT_CAPABILITIES.md).
+
+## Database access and schema
+
+Opening a page never changes the database. Pages verify the schema they need
+and, if it is missing, say so. Migrations are applied only on request:
+
+```bash
+python -m datamind_console.db.schema_cli status
+```
+```bash
+python -m datamind_console.db.schema_cli plan <unit>
+```
+```bash
+python -m datamind_console.db.schema_cli apply <unit> --yes
+```
+
+`apply` runs migration SQL against the configured database; `plan` shows what
+each file would do, including data changes. Code reads through the helpers in
+`datamind_console/db/db.py` (`query_all`, `read_only_connection`,
+`transaction`, …). See [docs/DB_ACCESS.md](docs/DB_ACCESS.md).
+
+To browse the console against a live database without any risk of writes,
+give the session a read-only default:
+`options=-c default_transaction_read_only=on` in the DSN (URL-encoded), or
+`PGOPTIONS="-c default_transaction_read_only=on"`.
+
+## MCP server (read-only)
+
+`tools/mcp_server.py` exposes the database to MCP clients. Every session is
+read-only with a 30 s statement timeout. `query_db` accepts a single
+`SELECT` / `WITH` / `EXPLAIN` / `SHOW` / `VALUES` / `TABLE` statement and
+rejects side-effect functions (`dblink*`, `pg_terminate_backend`, `lo_*`,
+`set_config`, `pg_sleep`, …). Results are capped at 500 rows.
 
 ## Adapt the pipeline to your region
 
@@ -145,14 +215,30 @@ Overpass and Valhalla can be started with `docker-compose.yml` (edit it to point
 
 ## Tests
 
+Run the suites **one folder at a time** (several `tests/` packages share a
+name), for example:
+
 ```bash
-python -B -m pytest -p no:cacheprovider local_runner/tests datamind_console/orchestrator/tests
-# → 248 passed, 5 skipped
+python -B -m pytest -p no:cacheprovider datamind_console --ignore=datamind_console/phases/phase3_routes/tests
+```
+```bash
+python -B -m pytest -p no:cacheprovider tests
 ```
 
-- Run them **per folder**: there are several `tests/` packages with the same name and pytest doesn't mix them well in a single invocation.
-- Tests that **need a populated database** are marked as integration tests and skip themselves. Enable them with `DB_DSN=... DATAMIND_RUN_DB_TESTS=1` (they assume real data of a region, not the sample).
-- 3 geographic-resolution tests check behaviors of the original region's catalog and are skipped (`@unittest.skip`) until you adapt them to yours.
+The other folders are `datamind_console/phases/phase3_routes/tests`,
+`tools/tests`, `phase1_nodes`, `phase2_semantics`, `phase3_routes/diagnostics`,
+`local_runner/tests`, and `phase3_routes/services/route_constructor/tests`
+(run from that directory). None of them needs a database, AWS or an external
+API. See [docs/TEST_CLASSIFICATION.md](docs/TEST_CLASSIFICATION.md).
+
+- Tests that **need a populated database** skip themselves. Enable them with
+  `DB_DSN=... DATAMIND_RUN_DB_TESTS=1` (they assume real data of a region, not
+  the sample). Tests that write (trash repository, human review, Phase 4
+  evidence) run only with `DATAMIND_DISPOSABLE_TEST_DSN` pointing at a database
+  whose name contains `test`, `scratch` or `disposable`.
+- Tests written against the original region's data files (place catalog,
+  Phase 3 catalogs, bbox catalog) are reported as **skipped** while those files
+  are absent; see `conftest.py`. With your own region's files they run.
 
 ## What's included and what isn't
 
@@ -172,6 +258,8 @@ python -B -m pytest -p no:cacheprovider local_runner/tests datamind_console/orch
 - The console in local mode must only be exposed on `127.0.0.1`. For remote access, use the login-and-sessions mode.
 - The AI assistant only opens a local terminal with an explicit flag (`ML_DATAMIND_LOCAL_CLI_LAUNCH_ENABLED`) and after reviewing the scope.
 - The phase 4 API requires `X-API-Key` (`PHASE4_API_KEY`) on the endpoints that write, and restricts CORS to the local console.
+- Secrets: `python tools/secret_scan.py --tracked` scans every tracked file and prints fingerprints, never values. `tools/git-hooks/pre-push` refuses a push whose new commits add a secret; install it with `cp tools/git-hooks/pre-push .git/hooks/pre-push`. See [docs/SECURITY_HYGIENE.md](docs/SECURITY_HYGIENE.md).
+- The autopilot signs operator decisions with `HADES_OPERATOR_SIGNING_SECRET`. Create your own with `python -m datamind_console.orchestrator.signing_key --write .env`; without it the console warns that the public development key is in use.
 - Before publishing your fork: run `gitleaks detect` and make sure you don't commit `.env`, dumps or data.
 
 ## License

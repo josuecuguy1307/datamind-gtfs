@@ -7,6 +7,7 @@ import pydeck as pdk
 import streamlit as st
 
 from .route_inputs_table import render_route_inputs_table
+from datamind_console.i18n import t, option_label
 
 
 @st.cache_data(ttl=120, show_spinner=False)
@@ -114,8 +115,8 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
     if isinstance(pending_set, dict):
         for k, v in pending_set.items():
             ss[k] = v
-    st.markdown("### Runtime Lab")
-    st.caption("Catalog-driven runtime approximation from shape points + ordered stops + direction context.")
+    st.markdown(t("ui.p5.runtime_lab_workspace.runtime_lab"))
+    st.caption(t("ui.p5.runtime_lab_workspace.catalog_driven_runtime_approximation_from_shape"))
 
     picked = render_route_inputs_table(client=client, key=f"{key}.inputs")
     if isinstance(picked, str) and picked.strip():
@@ -125,48 +126,46 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
     service_route_id = str(ss.get("phase5.service_route_id") or "").strip()
     direction_id = int(ss.get("phase5.direction_id") or 0)
     if not route_id:
-        st.info("Select `service_route_id + direction` first.")
+        st.info(t("ui.p5.runtime_lab_workspace.select_service_route_id_direction_first"))
         return
-    st.caption(f"service_route_id: `{service_route_id or '-'}` | direction_id: `{direction_id}` | route_id: `{route_id}`")
+    st.caption(t("ui.p5.runtime_lab_workspace.service_route_id_service_route_id", service_route_id=(service_route_id or '-'), direction_id=(direction_id), route_id=(route_id)))
     try:
         bound = client.get_runtime_estimate_binding(route_id=route_id, direction_id=int(direction_id))
     except Exception:
         bound = {}
     if bound:
         st.caption(
-            "Bound leg-runtime estimate: "
-            f"`{str(bound.get('estimate_id') or '')[:8]}` "
-            f"(updated `{bound.get('updated_at')}`)"
+            t("ui.p5.runtime_lab_workspace.bound_leg_runtime_estimate_v1_updated", v1=(str(bound.get('estimate_id') or '')[:8]), updated_at=(bound.get('updated_at')))
         )
     else:
-        st.caption("Bound leg-runtime estimate: `none` (Step 05 is blocked until you apply+bind one).")
+        st.caption(t("ui.p5.runtime_lab_workspace.bound_leg_runtime_estimate_none_step"))
 
     ctl1, ctl2, ctl3 = st.columns([1, 1, 1.4])
     with ctl1:
-        replace_existing = st.checkbox("Replace existing defaults", value=False, key=f"{key}.seed.replace")
+        replace_existing = st.checkbox(t("ui.p5.runtime_lab_workspace.replace_existing_defaults"), value=False, key=f"{key}.seed.replace")
     with ctl2:
-        if st.button("Seed Quito v1 catalogs", use_container_width=True, key=f"{key}.seed"):
+        if st.button(t("ui.p5.runtime_lab_workspace.seed_quito_v1_catalogs"), use_container_width=True, key=f"{key}.seed"):
             try:
                 out = client.seed_runtime_catalog_defaults(replace_existing=bool(replace_existing))
             except Exception as e:
-                st.error(f"Seed failed: {e}")
+                st.error(t("ui.p5.runtime_lab_workspace.seed_failed_e", e=(e)))
             else:
                 st.cache_data.clear()
-                st.success(f"Seed done: inserted={out.get('inserted')} updated={out.get('updated')}")
+                st.success(t("ui.p5.runtime_lab_workspace.seed_done_inserted_inserted_updated_updated", inserted=(out.get('inserted')), updated=(out.get('updated'))))
     with ctl3:
-        if st.button("Refresh Runtime Lab cache", use_container_width=True, key=f"{key}.refresh"):
+        if st.button(t("ui.p5.runtime_lab_workspace.refresh_runtime_lab_cache"), use_container_width=True, key=f"{key}.refresh"):
             st.cache_data.clear()
             st.rerun()
 
     items = _cached_catalog_items(_client=client, active_only=False, limit=8000)
     if not items:
-        st.warning("No Runtime Lab catalogs yet. Click `Seed Quito v1 catalogs`.")
+        st.warning(t("ui.p5.runtime_lab_workspace.no_runtime_lab_catalogs_yet_click"))
         return
 
-    st.caption("Catalog editing moved to `Phase 5 screen -> Catalog Tuning`.")
+    st.caption(t("ui.p5.runtime_lab_workspace.catalog_editing_moved_phase_5_screen"))
 
     # Estimator controls
-    st.markdown("#### Per-direction estimation")
+    st.markdown(t("ui.p5.runtime_lab_workspace.per_direction_estimation"))
     area_opts = ["auto"] + _catalog_options(items, "area_profile_catalog")
     speed_opts = [""] + _catalog_options(items, "speed_catalog")
     dwell_opts = [""] + _catalog_options(items, "dwell_catalog")
@@ -176,17 +175,20 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        area_code = st.selectbox("area_profile_code", area_opts, index=0, key=f"{key}.est.area")
-        speed_code = st.selectbox("speed_profile_code (optional override)", speed_opts, index=0, key=f"{key}.est.speed")
+        area_code = st.selectbox(
+            "area_profile_code", area_opts, index=0, key=f"{key}.est.area",
+            format_func=lambda v: t("common.auto") if v == "auto" else v,
+        )
+        speed_code = st.selectbox(t("ui.p5.runtime_lab_workspace.speed_profile_code_optional_override"), speed_opts, index=0, key=f"{key}.est.speed")
     with c2:
-        dwell_code = st.selectbox("dwell_profile_code (optional override)", dwell_opts, index=0, key=f"{key}.est.dwell")
-        inter_code = st.selectbox("intersection_profile_code (optional override)", inter_opts, index=0, key=f"{key}.est.inter")
+        dwell_code = st.selectbox(t("ui.p5.runtime_lab_workspace.dwell_profile_code_optional_override"), dwell_opts, index=0, key=f"{key}.est.dwell")
+        inter_code = st.selectbox(t("ui.p5.runtime_lab_workspace.intersection_profile_code_optional_override"), inter_opts, index=0, key=f"{key}.est.inter")
     with c3:
-        peak_code = st.selectbox("peak_profile_code (optional override)", peak_opts, index=0, key=f"{key}.est.peak")
+        peak_code = st.selectbox(t("ui.p5.runtime_lab_workspace.peak_profile_code_optional_override"), peak_opts, index=0, key=f"{key}.est.peak")
         conf_code = st.selectbox("confidence_profile_code", conf_opts, index=0, key=f"{key}.est.conf")
 
     auto_fill_on_area = st.checkbox(
-        "Auto-fill overrides when area_profile changes",
+        t("ui.p5.runtime_lab_workspace.auto_fill_overrides_when_area_profile"),
         value=True,
         key=f"{key}.est.autofill_on_area",
     )
@@ -210,42 +212,43 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
 
     e1, e2, e3, e4 = st.columns(4)
     with e1:
-        use_external_elevation = st.checkbox("Use external elevation API", value=True, key=f"{key}.est.ext_elev")
+        use_external_elevation = st.checkbox(t("ui.p5.runtime_lab_workspace.use_external_elevation_api"), value=True, key=f"{key}.est.ext_elev")
     with e2:
-        use_external_signals = st.checkbox("Use Overpass traffic signals", value=False, key=f"{key}.est.ext_signals")
+        use_external_signals = st.checkbox(t("ui.p5.runtime_lab_workspace.use_overpass_traffic_signals"), value=False, key=f"{key}.est.ext_signals")
     with e3:
-        persist_snapshot = st.checkbox("Persist estimate snapshot in DB", value=True, key=f"{key}.est.persist")
+        persist_snapshot = st.checkbox(t("ui.p5.runtime_lab_workspace.persist_estimate_snapshot_db"), value=True, key=f"{key}.est.persist")
     with e4:
         allow_haversine_fallback = st.checkbox(
-            "Allow stop-to-stop fallback",
+            t("ui.p5.runtime_lab_workspace.allow_stop_stop_fallback"),
             value=False,
             key=f"{key}.est.allow_fallback",
-            help="Use haversine distance for legs that cannot be projected to shape points.",
+            help=t("ui.p5.runtime_lab_workspace.use_haversine_distance_legs_that_cannot"),
         )
 
     s1, s2 = st.columns(2)
     with s1:
         mode_strategy = st.selectbox(
-            "Mode strategy",
+            t("ui.p5.runtime_lab_workspace.mode_strategy"),
             options=["single_mode", "mixed_sections"],
             index=0,
             key=f"{key}.est.mode",
-            help="single_mode: one profile for all route. mixed_sections: score and apply profile by contiguous sections.",
+            help=t("ui.p5.runtime_lab_workspace.single_mode_one_profile_all_route"),
+            format_func=option_label("mode_strategy"),
         )
     with s2:
         section_min_score = st.slider(
-            "Section score threshold",
+            t("ui.p5.runtime_lab_workspace.section_score_threshold"),
             min_value=0.0,
             max_value=1.0,
             value=0.58,
             step=0.01,
             key=f"{key}.est.section_score",
-            help="For mixed_sections, low-score legs fall back to selected area profile.",
+            help=t("ui.p5.runtime_lab_workspace.mixed_sections_low_score_legs_fall"),
         )
 
     af1, af2, af3 = st.columns([1, 1, 2])
     with af1:
-        if st.button("Analyze route + suggest profile", use_container_width=True, key=f"{key}.est.analyze"):
+        if st.button(t("ui.p5.runtime_lab_workspace.analyze_route_suggest_profile"), use_container_width=True, key=f"{key}.est.analyze"):
             try:
                 sug = _cached_area_suggestion(
                     _client=client,
@@ -256,17 +259,17 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
                     allow_haversine_fallback=bool(allow_haversine_fallback),
                 )
             except Exception as e:
-                st.error(f"Suggestion failed: {e}")
+                st.error(t("ui.p5.runtime_lab_workspace.suggestion_failed_e", e=(e)))
             else:
                 ss[f"{key}.analysis"] = sug
-                st.success("Route analysis ready.")
+                st.success(t("ui.p5.runtime_lab_workspace.route_analysis_ready"))
     with af2:
-        if st.button("Autofill defaults from selected area", use_container_width=True, key=f"{key}.est.autofill"):
+        if st.button(t("ui.p5.runtime_lab_workspace.autofill_defaults_from_selected_area"), use_container_width=True, key=f"{key}.est.autofill"):
             area_rows = [dict(x) for x in items if str(x.get("catalog_key") or "") == "area_profile_catalog"]
             area_row = next((r for r in area_rows if str(r.get("item_code") or "") == str(area_code)), {})
             payload = dict(area_row.get("payload") or {})
             if not payload:
-                st.warning("Selected area profile has no defaults.")
+                st.warning(t("ui.p5.runtime_lab_workspace.selected_area_profile_has_no_defaults"))
             else:
                 ss[f"{key}.est.pending_set"] = {
                     f"{key}.est.speed": str(payload.get("default_speed_profile") or ""),
@@ -274,27 +277,24 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
                     f"{key}.est.inter": str(payload.get("default_intersection_profile") or ""),
                     f"{key}.est.peak": str(payload.get("default_peak_profile") or ""),
                 }
-                st.success("Autofilled from area profile defaults.")
+                st.success(t("ui.p5.runtime_lab_workspace.autofilled_from_area_profile_defaults"))
                 st.rerun()
     with af3:
-        st.caption("Use `Analyze route + suggest profile` for a recommendation, or manually pick catalog overrides.")
+        st.caption(t("ui.p5.runtime_lab_workspace.use_analyze_route_suggest_profile_recommendation"))
 
     analysis = ss.get(f"{key}.analysis") or {}
     if analysis:
         rec = str(analysis.get("suggested_area_profile_code") or "")
         if rec:
-            st.info(f"Suggested area profile: `{rec}`")
+            st.info(t("ui.p5.runtime_lab_workspace.suggested_area_profile_rec", rec=(rec)))
         feats = analysis.get("features") or {}
         st.caption(
-            f"stop_spacing_m={float(feats.get('stop_spacing_m') or 0):.2f} | "
-            f"signals_per_km={float(feats.get('signals_per_km') or 0):.2f} | "
-            f"terrain_density={float(feats.get('terrain_density_score') or 0):.3f} | "
-            f"curve_ratio={float(feats.get('curve_ratio') or 0):.3f}"
+            t("ui.p5.runtime_lab_workspace.stop_spacing_m_stop_spacing_m", stop_spacing_m=format((float(feats.get('stop_spacing_m') or 0)), '.2f'), signals_per_km=format((float(feats.get('signals_per_km') or 0)), '.2f'), terrain_density_score=format((float(feats.get('terrain_density_score') or 0)), '.3f'), curve_ratio=format((float(feats.get('curve_ratio') or 0)), '.3f'))
         )
         sug_rows = [dict(x) for x in (analysis.get("suggestions") or [])]
         if sug_rows:
             st.dataframe(sug_rows, use_container_width=True, hide_index=True, height=180)
-            if st.button("Apply suggested area + defaults", use_container_width=True, key=f"{key}.est.apply_suggested", disabled=(not rec)):
+            if st.button(t("ui.p5.runtime_lab_workspace.apply_suggested_area_defaults"), use_container_width=True, key=f"{key}.est.apply_suggested", disabled=(not rec)):
                 top = sug_rows[0] if sug_rows else {}
                 defaults = dict(top.get("defaults") or {})
                 ss[f"{key}.est.pending_set"] = {
@@ -304,10 +304,10 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
                     f"{key}.est.inter": str(defaults.get("intersection_profile_code") or ""),
                     f"{key}.est.peak": str(defaults.get("peak_profile_code") or ""),
                 }
-                st.success("Applied suggested profile into form.")
+                st.success(t("ui.p5.runtime_lab_workspace.applied_suggested_profile_into_form"))
                 st.rerun()
 
-    if st.button("Compute runtime estimate", type="primary", use_container_width=True, key=f"{key}.est.run"):
+    if st.button(t("ui.p5.runtime_lab_workspace.compute_runtime_estimate"), type="primary", use_container_width=True, key=f"{key}.est.run"):
         try:
             est = _cached_runtime_estimate(
                 _client=client,
@@ -327,10 +327,10 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
                 allow_haversine_fallback=bool(allow_haversine_fallback),
             )
         except Exception as e:
-            st.error(f"Estimate failed: {e}")
+            st.error(t("ui.p5.runtime_lab_workspace.estimate_failed_e", e=(e)))
             return
         ss[f"{key}.estimate"] = est
-        st.success("Estimate computed.")
+        st.success(t("ui.p5.runtime_lab_workspace.estimate_computed"))
 
     est = ss.get(f"{key}.estimate") or {}
     if est:
@@ -342,34 +342,30 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
 
         left_res, right_res = st.columns([1.25, 1.0], gap="large")
         with right_res:
-            st.markdown("##### Whole-route runtime")
+            st.markdown(t("ui.p5.runtime_lab_workspace.whole_route_runtime"))
             rm1, rm2 = st.columns(2)
-            rm1.metric("Route len (m)", int(m.get("route_len_m") or 0))
-            rm2.metric("Confidence", f"{float(m.get('confidence') or 0):.3f}")
+            rm1.metric(t("ui.p5.runtime_lab_workspace.route_len_m"), int(m.get("route_len_m") or 0))
+            rm2.metric(t("ui.p5.runtime_lab_workspace.confidence"), f"{float(m.get('confidence') or 0):.3f}")
             rm3, rm4 = st.columns(2)
-            rm3.metric("Offpeak runtime", f"{int(m.get('runtime_offpeak_secs') or 0)} s")
-            rm4.metric("Peak runtime", f"{int(m.get('runtime_peak_secs') or 0)} s")
+            rm3.metric(t("ui.p5.runtime_lab_workspace.offpeak_runtime"), f"{int(m.get('runtime_offpeak_secs') or 0)} s")
+            rm4.metric(t("ui.p5.runtime_lab_workspace.peak_runtime"), f"{int(m.get('runtime_peak_secs') or 0)} s")
             rm5, rm6 = st.columns(2)
             rm5.metric("offpeak_min_per_leg", f"{float(m.get('offpeak_min_per_leg') or 0):.3f}")
             rm6.metric("peak_min_per_leg", f"{float(m.get('peak_min_per_leg') or 0):.3f}")
             st.caption(
-                f"offpeak_headway_secs={int(m.get('offpeak_headway_secs') or 0)} | "
-                f"peak_headway_secs={int(m.get('peak_headway_secs') or 0)} | "
-                f"terrain_density={float(m.get('terrain_density_score') or 0):.3f}"
+                t("ui.p5.runtime_lab_workspace.offpeak_headway_secs_offpeak_headway_secs", offpeak_headway_secs=(int(m.get('offpeak_headway_secs') or 0)), peak_headway_secs=(int(m.get('peak_headway_secs') or 0)), terrain_density_score=format((float(m.get('terrain_density_score') or 0)), '.3f'))
             )
             st.caption(
-                f"elevation_source={mi.get('elevation_source')} ({int(mi.get('elevation_samples') or 0)} samples) | "
-                f"signal_source={mi.get('signal_source')} ({int(mi.get('signal_points') or 0)} points) | "
-                f"signals_per_km_used={float(mi.get('signals_per_km_used') or 0):.2f}"
+                t("ui.p5.runtime_lab_workspace.elevation_source_elevation_source_elevation_samples", elevation_source=(mi.get('elevation_source')), elevation_samples=(int(mi.get('elevation_samples') or 0)), signal_source=(mi.get('signal_source')), signal_points=(int(mi.get('signal_points') or 0)), signals_per_km_used=format((float(mi.get('signals_per_km_used') or 0)), '.2f'))
             )
             auto_rebuild = st.checkbox(
-                "Auto rebuild Step 04 + Step 05 on apply (current route+direction only)",
+                t("ui.p5.runtime_lab_workspace.auto_rebuild_step_04_step_05"),
                 value=True,
                 key=f"{key}.est.auto_rebuild",
             )
             r1, r2 = st.columns(2)
             with r1:
-                if st.button("Apply estimate to Phase 5 editor", use_container_width=True, key=f"{key}.est.apply"):
+                if st.button(t("ui.p5.runtime_lab_workspace.apply_estimate_phase_5_editor"), use_container_width=True, key=f"{key}.est.apply"):
                     st.session_state["p5_profile.offpeak_leg_min"] = float(m.get("offpeak_min_per_leg") or 1.5)
                     st.session_state["p5_profile.peak_leg_min"] = float(m.get("peak_min_per_leg") or 2.5)
                     st.session_state["p5_profile.offpeak_headway"] = int(m.get("offpeak_headway_secs") or 600)
@@ -392,7 +388,7 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
                                 estimate_id=est_id,
                             )
                         except Exception as e:
-                            st.warning(f"Editor values applied, but estimate binding failed: {e}")
+                            st.warning(t("ui.p5.runtime_lab_workspace.editor_values_applied_but_estimate_binding", e=(e)))
                         else:
                             if auto_rebuild:
                                 run_id = str(st.session_state.get("phase5.export_run_id") or "").strip()
@@ -410,37 +406,34 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
                                         )
                                     except Exception as e:
                                         st.warning(
-                                            "Applied to editor + bound estimate, but auto rebuild failed: "
-                                            f"{e}"
+                                            t("ui.p5.runtime_lab_workspace.applied_editor_bound_estimate_but_auto", e=(e))
                                         )
                                     else:
-                                        st.success("Applied + bound + rebuilt Step 04/05 for current route+direction.")
+                                        st.success(t("ui.p5.runtime_lab_workspace.applied_bound_rebuilt_step_04_05"))
                                         st.caption(
-                                            f"Step 04: trips={int(out4.get('trips') or 0)} | "
-                                            f"Step 05: stop_times={int(out5.get('stop_times') or 0)}"
+                                            t("ui.p5.runtime_lab_workspace.step_04_trips_trips_step_05", trips=(int(out4.get('trips') or 0)), stop_times=(int(out5.get('stop_times') or 0)))
                                         )
                                 else:
-                                    st.success("Applied + bound estimate. Select export_run_id to auto rebuild stop_times.")
+                                    st.success(t("ui.p5.runtime_lab_workspace.applied_bound_estimate_select_export_run"))
                             else:
-                                st.success("Applied to editor + bound leg-by-leg estimate for Step 05.")
+                                st.success(t("ui.p5.runtime_lab_workspace.applied_editor_bound_leg_by_leg"))
                     else:
                         st.warning(
-                            "Applied to editor fields only. "
-                            "No persisted estimate_id found; enable `Persist estimate snapshot in DB` and recompute."
+                            t("ui.p5.runtime_lab_workspace.applied_editor_fields_only_no_persisted")
                         )
             with r2:
-                if st.button("Show full estimate JSON", use_container_width=True, key=f"{key}.est.show_json"):
+                if st.button(t("ui.p5.runtime_lab_workspace.show_full_estimate_json"), use_container_width=True, key=f"{key}.est.show_json"):
                     st.json(est)
 
-            st.markdown("##### Suggestion by section")
+            st.markdown(t("ui.p5.runtime_lab_workspace.suggestion_by_section"))
             if section_rows:
                 st.dataframe(section_rows, use_container_width=True, hide_index=True, height=220)
             else:
-                st.info("No per-section assignment available yet. Use `mixed_sections` mode and recompute.")
+                st.info(t("ui.p5.runtime_lab_workspace.no_per_section_assignment_available_yet"))
 
         with left_res:
             if stop_dwell_rows:
-                st.markdown("##### Dwell seconds by stop")
+                st.markdown(t("ui.p5.runtime_lab_workspace.dwell_seconds_by_stop"))
                 dwell_chart = [
                     {
                         "stop_seq": int(r.get("stop_seq") or i + 1),
@@ -456,7 +449,7 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
                     use_container_width=True,
                 )
             if leg_rows:
-                st.markdown("##### Leg-by-leg preview (shape-aware)")
+                st.markdown(t("ui.p5.runtime_lab_workspace.leg_by_leg_preview_shape_aware"))
                 chart_data = [
                     {
                         "leg_idx": int(r.get("leg_idx") or i + 1),
@@ -480,22 +473,21 @@ def render_runtime_lab_workspace(*, ctx: Any, client: Any, key: str = "p5_runtim
             fallback_legs = [str(x) for x in (est.get("fallback_legs") or []) if str(x).strip()]
             if fallback_legs:
                 st.warning(
-                    "Fallback used for some legs (stop-to-stop haversine). "
-                    f"Count={len(fallback_legs)} | Examples: {', '.join(fallback_legs[:6])}"
+                    t("ui.p5.runtime_lab_workspace.fallback_used_some_legs_stop_stop", n_fallback_legs=(len(fallback_legs)), join=(', '.join(fallback_legs[:6])))
                 )
 
     # Map
-    st.markdown("#### Route map + stops")
+    st.markdown(t("ui.p5.runtime_lab_workspace.route_map_stops"))
     try:
         mp = _cached_route_map_payload(_client=client, route_id=route_id)
     except Exception as e:
-        st.warning(f"Map payload unavailable: {e}")
+        st.warning(t("ui.p5.runtime_lab_workspace.map_payload_unavailable_e", e=(e)))
         return
 
     stops = [dict(x) for x in (mp.get("stops") or [])]
     path = _geojson_path(mp.get("route_geojson") or {})
     if not stops and not path:
-        st.info("No geometry/stops available for this route.")
+        st.info(t("ui.p5.runtime_lab_workspace.no_geometry_stops_available_this_route"))
         return
 
     center_lat = float(stops[0].get("lat")) if stops else float(path[0][0])

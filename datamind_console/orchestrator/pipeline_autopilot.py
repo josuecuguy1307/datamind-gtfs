@@ -39,6 +39,7 @@ from datamind_console.orchestrator.role_policy import (
 )
 from datamind_console.orchestrator.autopilot_db_store import AutopilotDBStore
 from datamind_console.orchestrator.autopilot_feature_flags import AutopilotFeatureFlags
+from datamind_console.orchestrator import signing_key as _signing_key
 from datamind_console.orchestrator.policy_engine import _normalize_profile as _normalize_profile_canonical
 
 try:
@@ -4126,16 +4127,13 @@ class SupervisedPipelineAutopilot:
         self._idempotency_cache: Dict[str, Dict[str, Any]] = {}
         self.runner_config_path = Path(str(runner_config_path or DEFAULT_AUTOPILOT_RUNNER_CONFIG)).expanduser().resolve()
         self.patch_dispatch_runner = patch_dispatch_runner or self._default_patch_dispatch_runner
-        self.operator_signing_secret = str(
-            operator_signing_secret
-            or os.getenv("HADES_OPERATOR_SIGNING_SECRET")
-            or os.getenv("DATAMIND_OPERATOR_SIGNING_SECRET")
-            or "hades-autopilot-dev-secret"
-        )
+        # Falls back to a public development key with a warning; see signing_key.py.
+        self.operator_signing_secret, self.operator_signing_secret_source = _signing_key.resolve(operator_signing_secret)
         self.allowed_operator_roles = _default_operator_roles()
         self.persistence_dir = Path(
             str(
                 persistence_dir
+                or os.getenv("DATAMIND_AUTOPILOT_RUNS_DIR")
                 or (
                     Path(__file__).resolve().parents[1]
                     / "orchestrator_logs"

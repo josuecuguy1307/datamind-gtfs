@@ -22,8 +22,8 @@ Three sections stack top-to-bottom:
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
-import os
 from glob import glob
 from pathlib import Path
 from typing import Any, Optional
@@ -36,27 +36,33 @@ import streamlit as st
 
 from hades.enforcers import re_entry_swap_service as swap_svc
 
+from datamind_console.db.db import active_dsn, read_only_connection
+from datamind_console.i18n import t
+from datamind_console.ui.components.states import error_state
+
 
 ROOT = Path(__file__).resolve().parents[5]
 
 _COV_LABELS = ("good", "acceptable", "degraded", "unroutable")
+# Badge per coverage class; the explanation is coverage.cov_class.<class> in the catalog.
 _COV_BADGE = {
-    "good":       ("🟢", "good — all gaps closed, no dead-head"),
-    "acceptable": ("🟡", "acceptable — 1-2 unresolved gaps under dead-head max"),
-    "degraded":   ("🟠", "degraded — ≥3 unresolved gaps OR tier5 ≥ 50 % of gaps"),
-    "unroutable": ("🔴", "unroutable — unresolved degraded-band gap OR dead-head over zone max"),
+    "good":       ("🟢", "good"),
+    "acceptable": ("🟡", "acceptable"),
+    "degraded":   ("🟠", "degraded"),
+    "unroutable": ("🔴", "unroutable"),
 }
 
 
 def _dsn() -> str:
-    value = os.environ.get("DB_DSN") or os.environ.get("LOCAL_DB_DSN")
-    if not value:
-        raise RuntimeError("DB_DSN or LOCAL_DB_DSN must be configured before loading coverage data.")
-    return value
+    """Canonical active DSN (honours local-only mode); never displayed."""
+    return active_dsn()
 
 
+@contextmanager
 def _connect():
-    return psycopg2.connect(_dsn())
+    """Short-lived READ ONLY connection, always closed (canonical helper)."""
+    with read_only_connection(statement_timeout_ms=30_000) as conn:
+        yield conn
 
 
 def _load_validated_landmarks() -> dict[str, set[int]]:
@@ -187,11 +193,11 @@ def _render_route_map(row: pd.Series) -> None:
         try: shape = json.loads(shape)
         except Exception: shape = None
     if not shape or not isinstance(shape, dict):
-        st.info("No v2 geometry available.")
+        st.info(t("ui.p3.coverage_improvement.no_v2_geometry_available"))
         return
     coords = shape.get("coordinates") or []
     if not coords:
-        st.info("No coords in v2 geometry.")
+        st.info(t("ui.p3.coverage_improvement.no_coords_v2_geometry"))
         return
     mid_lon, mid_lat = coords[len(coords) // 2][:2]
 
@@ -249,8 +255,7 @@ def _render_route_map(row: pd.Series) -> None:
         use_container_width=True,
     )
     st.caption(
-        "Legend — grey: v1/original stops · amber: synthesized · "
-        "red dot: Fixer-inserted (Tier 1/2/4/5)."
+        t("ui.p3.coverage_improvement.legend_grey_v1_original_stops_amber")
     )
 
 
@@ -326,16 +331,16 @@ def _snapper_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 _Q_BUCKETS = {
-    "Ready to Ship": ("good", "acceptable", "ship_pending_dr"),
-    "Review First":  ("degraded_minor",),
-    "Needs Work":    ("degraded",),
-    "Cannot Fix":    ("unroutable",),
+    "ready_to_ship": ("good", "acceptable", "ship_pending_dr"),
+    "review_first":  ("degraded_minor",),
+    "needs_work":    ("degraded",),
+    "cannot_fix":    ("unroutable",),
 }
 _Q_BADGE = {
-    "Ready to Ship": "🟢",
-    "Review First":  "🟡",
-    "Needs Work":    "🟠",
-    "Cannot Fix":    "🔴",
+    "ready_to_ship": "🟢",
+    "review_first":  "🟡",
+    "needs_work":    "🟠",
+    "cannot_fix":    "🔴",
 }
 
 
@@ -403,16 +408,16 @@ def _render_dr_enrichment_summary(unit: str) -> None:
                 if r.get("route_code") in unit_rids: n_rejected += 1
 
     st.markdown("---")
-    st.markdown("### 📊 DR enrichment — cumulative results")
+    st.markdown(t("ui.p3.coverage_improvement.dr_enrichment_cumulative_results"))
     cols = st.columns(5)
-    cols[0].metric("📝 prompts total", n_total,
-                   delta=f"{n_pending} pending / {n_archived} processed",
+    cols[0].metric(t("ui.p3.coverage_improvement.prompts_total"), n_total,
+                   delta=t("coverage.dr.pending_processed", pending=n_pending, processed=n_archived),
                    delta_color="off")
-    cols[1].metric("💾 responses saved", n_responses)
-    cols[2].metric("✅ ACCEPT landmarks", n_accepted)
-    cols[3].metric("🟡 UNCERTAIN", n_uncertain)
-    cols[4].metric("❌ REJECT", n_rejected,
-                   delta=f"accept rate {100*n_accepted/max(n_accepted+n_uncertain+n_rejected,1):.0f}%",
+    cols[1].metric(t("ui.p3.coverage_improvement.responses_saved"), n_responses)
+    cols[2].metric(t("ui.p3.coverage_improvement.accept_landmarks"), n_accepted)
+    cols[3].metric(t("ui.p3.coverage_improvement.uncertain"), n_uncertain)
+    cols[4].metric(t("ui.p3.coverage_improvement.reject"), n_rejected,
+                   delta=t("coverage.dr.accept_rate", pct=f"{100*n_accepted/max(n_accepted+n_uncertain+n_rejected,1):.0f}"),
                    delta_color="off")
 
 
@@ -423,14 +428,13 @@ def _render_quality_buckets(df: pd.DataFrame) -> None:
     by_class = df["quality_class"].fillna("unknown").value_counts().to_dict()
     last_classified = df["classified_at"].dropna().max() if "classified_at" in df.columns else None
     st.markdown(
-        f"**{len(df)} pending** · last reclassified "
-        f"`{last_classified or '(never)'}`"
+        t("ui.p3.coverage_improvement.n_df_pending_last_reclassified_last", n_df=(len(df)), last_classified=(last_classified or '(never)'))
     )
     cols = st.columns(len(_Q_BUCKETS))
     for i, (name, classes) in enumerate(_Q_BUCKETS.items()):
         n = sum(int(by_class.get(c, 0)) for c in classes)
         breakdown = " · ".join(f"{c}: {int(by_class.get(c, 0))}" for c in classes)
-        cols[i].metric(f"{_Q_BADGE[name]} {name}", n, delta=breakdown,
+        cols[i].metric(f"{_Q_BADGE[name]} {t(f'reentry.bucket.{name}')}", n, delta=breakdown,
                        delta_color="off")
 
     blocking: dict[str, int] = {}
@@ -439,7 +443,7 @@ def _render_quality_buckets(df: pd.DataFrame) -> None:
             blocking[b] = blocking.get(b, 0) + 1
     if blocking:
         with st.expander(
-            f"🚧 DR Batches blocking shipments — {len(blocking)} batch(es)",
+            t("ui.p3.coverage_improvement.dr_batches_blocking_shipments_n_blocking", n_blocking=(len(blocking))),
             expanded=False,
         ):
             st.dataframe(
@@ -457,18 +461,17 @@ def _render_dr_dependency_panel_for_row(row: pd.Series) -> None:
     pending = list(row.get("pending_dr_batches") or [])
     if cls not in ("ship_pending_dr", "degraded_minor") or not pending:
         return
-    st.markdown("##### 🚧 DR dependencies")
+    st.markdown(t("ui.p3.coverage_improvement.dr_dependencies"))
     st.markdown(
-        f"Waiting on **{len(pending)}** DR batch(es) to resolve "
-        f"**{int(row.get('tier4_pending_count') or 0)}** tier-4 gap(s)."
+        t("ui.p3.coverage_improvement.waiting_n_pending_dr_batch_es", n_pending=(len(pending)), tier4_pending_count=(int(row.get('tier4_pending_count') or 0)))
     )
     for b in pending:
         if b.startswith("batch_"):
             link = f"workspace/dr_stop_coverage/queries/{b}.md"
-            note = "(existing batch)"
+            note = t("coverage.dr.existing_batch")
         else:
             link = f"workspace/dr_stop_coverage/pending_requests/{b}.md"
-            note = "(on-demand request)"
+            note = t("coverage.dr.on_demand")
         st.markdown(f"- `{b}` → `{link}`  {note}")
 
 
@@ -549,16 +552,14 @@ def _render_type1_grounding_status(unit: str) -> None:
     for v in status.values():
         by_status[v["status"]] = by_status.get(v["status"], 0) + 1
     st.markdown("---")
-    st.markdown("### 🛬 DR Type 1 — route grounding (n_stops=0 cohort)")
+    st.markdown(t("ui.p3.coverage_improvement.dr_type_1_route_grounding_n"))
     st.caption(
-        "Routes that DR Type 2 cannot help (no stops anchored to the polyline) "
-        "use the skill 06c stop-grounding flow. Tracking each prompt's lifecycle "
-        "from pending → sent → responded."
+        t("ui.p3.coverage_improvement.routes_that_dr_type_2_cannot")
     )
     cols = st.columns(3)
-    cols[0].metric("📝 pending (not yet pasted)", by_status.get("pending", 0))
-    cols[1].metric("📤 sent (in Claude.ai)",      by_status.get("sent", 0))
-    cols[2].metric("✅ responded",                by_status.get("responded", 0))
+    cols[0].metric(t("ui.p3.coverage_improvement.pending_not_yet_pasted"), by_status.get("pending", 0))
+    cols[1].metric(t("ui.p3.coverage_improvement.sent_claude_ai"),      by_status.get("sent", 0))
+    cols[2].metric(t("ui.p3.coverage_improvement.responded"),                by_status.get("responded", 0))
     rows = []
     for rc, v in sorted(status.items()):
         rows.append({
@@ -634,43 +635,41 @@ def _render_failed_re_entry_panel(unit: str) -> None:
     # Bucket error messages into families.
     def _bucket(err: str) -> str:
         err = (err or "").lower()
-        if "would_regress" in err: return "would_regress — scratch/gap_fill would produce worse v2"
-        if "already_good"  in err: return "already_good — v1 was already optimal"
-        if "scratch_no_improvement" in err: return "scratch_no_improvement — scratch couldn't improve"
-        if "scratch_built" in err: return "scratch_built — built but got rejected by strict gate"
-        if "coordinator rejected" in err: return "coordinator_reject — policy engine send_to_phase2"
-        if "no_improvement" in err: return "no_improvement (other)"
-        if not err.strip(): return "(empty error)"
+        if "would_regress" in err: return "would_regress"
+        if "already_good"  in err: return "already_good"
+        if "scratch_no_improvement" in err: return "scratch_no_improvement"
+        if "scratch_built" in err: return "scratch_built"
+        if "coordinator rejected" in err: return "coordinator_reject"
+        if "no_improvement" in err: return "no_improvement"
+        if not err.strip(): return "empty"
         return "other"
 
     df = df.copy()
     df["route"] = df["route_code"].str[:8]
-    df["error_bucket"] = df["last_error"].fillna("").apply(_bucket)
+    df["error_bucket"] = df["last_error"].fillna("").apply(lambda e: t(f"coverage.error_family.{_bucket(e)}"))
     summary = df["error_bucket"].value_counts().to_dict()
 
     st.markdown("---")
     st.markdown(
-        f"### ⚫ Recent failed re_entry_queue — {len(df)} route(s) in last 48 h"
+        t("ui.p3.coverage_improvement.recent_failed_re_entry_queue_n", n_df=(len(df)))
     )
     st.caption(
-        "Scoped to last 48 h · excludes `unclassified` out-of-scope · excludes routes "
-        "that already have a pending/approved v2. "
-        "**Most of these are NOT bugs** — they're the worker's conservative "
-        "\"I won't touch v1\" decisions: `would_regress` = v2 would be worse, "
-        "`already_good` = v1 is already optimal, `coordinator_reject` = policy sent "
-        "to phase2 pipeline. The original v1 of each of these routes is still live "
-        "in `route_prod.routes`. Operator action only needed if you want to FORCE "
-        "a v2 attempt with different config (`--mode scratch --strictness relaxed`)."
+        t("ui.p3.coverage_improvement.scoped_last_48_h_excludes_unclassified")
     )
     # Summary by error family
-    summary_rows = [{"error_family": k, "routes": v} for k, v in
+    summary_rows = [{t("coverage.col.error_family"): k, t("coverage.col.routes"): v} for k, v in
                     sorted(summary.items(), key=lambda kv: -kv[1])]
     st.dataframe(pd.DataFrame(summary_rows), hide_index=True, use_container_width=True)
 
-    with st.expander(f"🔍 See all {len(df)} routes"):
+    with st.expander(t("ui.p3.coverage_improvement.see_all_n_df_routes", n_df=(len(df)))):
         df_disp = df[["route", "route_name", "status", "attempts",
                       "attempted_at", "error_bucket", "last_error"]].copy()
         df_disp["last_error"] = df_disp["last_error"].fillna("").str.slice(0, 140)
+        df_disp = df_disp.rename(columns={
+            "route": t("col.route"), "route_name": t("coverage.col.name"), "status": t("coverage.col.status"),
+            "attempts": t("coverage.col.attempts"), "attempted_at": t("coverage.col.attempted_at"),
+            "error_bucket": t("coverage.col.error_family"), "last_error": t("coverage.col.last_error"),
+        })
         st.dataframe(df_disp, hide_index=True, use_container_width=True, height=360)
 
 
@@ -679,11 +678,11 @@ def _render_latest_pass_summary(unit: str) -> None:
     the headline numbers, so the operator can see at a glance what state the
     pending queue arrived from."""
     st.markdown("---")
-    st.markdown("### 📋 Latest re-entry pass — summary")
+    st.markdown(t("ui.p3.coverage_improvement.latest_re_entry_pass_summary"))
     base = ROOT / "workspace" / "unit_logs" / unit
     cmpl = base / "COMPLETE.md"
     if not cmpl.exists():
-        st.info(f"No COMPLETE.md yet for unit={unit}.")
+        st.info(t("ui.p3.coverage_improvement.no_complete_md_yet_unit_unit", unit=(unit)))
         return
     text = cmpl.read_text()
     # Extract a few headline lines
@@ -696,7 +695,7 @@ def _render_latest_pass_summary(unit: str) -> None:
         if any(k in line for k in headline_keys):
             summary_lines.append(line.strip("- "))
     st.markdown("\n".join(f"- {l}" for l in summary_lines[:10]))
-    with st.expander("Full COMPLETE.md"):
+    with st.expander(t("ui.p3.coverage_improvement.full_complete_md")):
         st.markdown(text)
 
 
@@ -713,15 +712,11 @@ def _render_snapper_experiments(unit: str) -> None:
     if not has_any_snapper:
         return
     with st.expander(
-        "🗄 Archived experiments (snapper + sequence optimizer) — deprecated 2026-04-22",
+        t("ui.p3.coverage_improvement.archived_experiments_snapper_sequence_optimizer_deprecated"),
         expanded=False,
     ):
         st.warning(
-            "**These experiments are archived.** All three iterations of the "
-            "stop snapper and the sequence-optimizer 3-way comparison either "
-            "regressed quality or made no measurable improvement. The current "
-            "production pipeline runs none of them. See per-eval JSONLs in "
-            "`workspace/unit_logs/<unit>/snapper_eval*/` for the raw data."
+            t("ui.p3.coverage_improvement.these_experiments_archived_all_three_iterations")
         )
 
         v1_rows = _load_snapper_eval_jsonl(base / "snapper_eval" / "per_route.jsonl")
@@ -736,33 +731,30 @@ def _render_snapper_experiments(unit: str) -> None:
             {"variant": "v2 (way_id continuity + name + length)", **_snapper_summary(v2_rows)},
             {"variant": "v2b (way_NAME continuity + name + length)", **_snapper_summary(v2b_rows)},
         ]).rename(columns={
-            "n": "routes",
-            "moved": "≥1 moved",
-            "wins": "WINS ✅",
-            "regressions": "REGRESSIONS ❌",
-            "reverted_length": "rev. by length",
-            "delta_p50_m": "Δ length p50 (m)",
-            "delta_p99_m": "Δ length p99 (m)",
+            "variant": t("coverage.col.variant"),
+            "n": t("coverage.col.routes"),
+            "moved": t("coverage.col.moved"),
+            "wins": t("coverage.col.wins"),
+            "regressions": t("coverage.col.regressions"),
+            "reverted_length": t("coverage.col.reverted_length"),
+            "delta_p50_m": t("coverage.col.delta_p50"),
+            "delta_p99_m": t("coverage.col.delta_p99"),
         })
         st.dataframe(cmp, use_container_width=True, hide_index=True)
         st.caption(
-            "v1: 8 wins / 16 regressions (detours to +32 km). "
-            "v2: 0 regressions / 1 win. "
-            "v2b: 0 regressions / 1 win — length gate reverted most borderline retraces. "
-            "Decision: abandon for QC; do not wire into worker."
+            t("ui.p3.coverage_improvement.v1_8_wins_16_regressions_detours")
         )
 
 
 def render_coverage_improvement_tab(ctx=None, **deps) -> None:
     top_l, top_r = st.columns([6, 1])
     with top_l:
-        st.subheader("Coverage Improvement Queue")
+        st.subheader(t("ui.p3.coverage_improvement.coverage_improvement_queue"))
         st.caption(
-            "Every pending re-entry v2 classified by **stop_coverage** quality. "
-            "Drill into any row to review + approve / reject / quarantine directly."
+            t("ui.p3.coverage_improvement.every_pending_re_entry_v2_classified")
         )
     with top_r:
-        if st.button("🔄 Refresh", key="p3.cov_improve.refresh", use_container_width=True):
+        if st.button(t("ui.p3.coverage_improvement.refresh"), key="p3.cov_improve.refresh", use_container_width=True):
             _load_qc_pending_v2s.clear()  # type: ignore[attr-defined]
             st.rerun()
 
@@ -772,11 +764,11 @@ def render_coverage_improvement_tab(ctx=None, **deps) -> None:
         p.stem for p in _amap_dir.glob("*.json") if p.stem != "unclassified"
     )
     if not _unit_options:
-        st.info("No regional unit is selected. Create or select an explicit work resource before reviewing coverage.")
+        st.info(t("ui.p3.coverage_improvement.no_regional_unit_selected_create_select"))
         return
     _default_idx = 0
     unit = st.selectbox(
-        "Unit",
+        t("ui.p3.coverage_improvement.unit"),
         options=_unit_options,
         index=_default_idx,
         key="p3.cov_improve.unit",
@@ -787,7 +779,7 @@ def render_coverage_improvement_tab(ctx=None, **deps) -> None:
     df = _load_qc_pending_v2s(unit)
     if not df.empty:
         st.markdown("---")
-        st.markdown("### v2 quality buckets")
+        st.markdown(t("ui.p3.coverage_improvement.v2_quality_buckets"))
         _render_quality_buckets(df)
 
     # DR enrichment cumulative results — shows how much DR work has been
@@ -802,7 +794,7 @@ def render_coverage_improvement_tab(ctx=None, **deps) -> None:
     _render_failed_re_entry_panel(unit)
 
     if df.empty:
-        st.info(f"No pending re-entry v2 proposals for unit={unit}.")
+        st.info(t("ui.p3.coverage_improvement.no_pending_re_entry_v2_proposals", unit=(unit)))
         _render_snapper_experiments(unit)
         return
 
@@ -821,13 +813,13 @@ def render_coverage_improvement_tab(ctx=None, **deps) -> None:
         total  = c_good + c_acc + c_spd + c_dmin + c_deg + c_unr
 
         cols = st.columns(7)
-        cols[0].metric("total pending",   total)
-        cols[1].metric("🟢 good",         c_good)
-        cols[2].metric("🟢 acceptable",   c_acc)
-        cols[3].metric("🟢 ship_pending_dr", c_spd)
-        cols[4].metric("🟡 degraded_minor",  c_dmin)
-        cols[5].metric("🟠 degraded",     c_deg)
-        cols[6].metric("🔴 unroutable",   c_unr)
+        cols[0].metric(t("ui.p3.coverage_improvement.total_pending"),   total)
+        cols[1].metric(t("ui.p3.coverage_improvement.good"),         c_good)
+        cols[2].metric(t("ui.p3.coverage_improvement.acceptable"),   c_acc)
+        cols[3].metric(t("ui.p3.coverage_improvement.ship_pending_dr"), c_spd)
+        cols[4].metric(t("ui.p3.coverage_improvement.degraded_minor"),  c_dmin)
+        cols[5].metric(t("ui.p3.coverage_improvement.degraded"),     c_deg)
+        cols[6].metric(t("ui.p3.coverage_improvement.unroutable"),   c_unr)
     else:
         # Fallback for older rows that never got quality_class populated.
         c_good = int((df["cov_class"] == "good").sum())
@@ -837,11 +829,11 @@ def render_coverage_improvement_tab(ctx=None, **deps) -> None:
         total  = c_good + c_acc + c_deg + c_unr
 
         cols = st.columns(5)
-        cols[0].metric("total pending", total)
-        cols[1].metric("🟢 good",       c_good)
-        cols[2].metric("🟡 acceptable", c_acc)
-        cols[3].metric("🟠 degraded",   c_deg)
-        cols[4].metric("🔴 unroutable", c_unr)
+        cols[0].metric(t("ui.p3.coverage_improvement.total_pending"), total)
+        cols[1].metric(t("ui.p3.coverage_improvement.good"),       c_good)
+        cols[2].metric(t("ui.p3.coverage_improvement.acceptable_2"), c_acc)
+        cols[3].metric(t("ui.p3.coverage_improvement.degraded"),   c_deg)
+        cols[4].metric(t("ui.p3.coverage_improvement.unroutable"), c_unr)
 
     st.markdown("---")
 
@@ -854,17 +846,15 @@ def render_coverage_improvement_tab(ctx=None, **deps) -> None:
     )
     class_col = "quality_class" if "quality_class" in df.columns else "cov_class"
     filter_choice = st.multiselect(
-        f"Show classifications (filtering on `{class_col}`)",
+        t("ui.p3.coverage_improvement.show_classifications_filtering_class_col", class_col=(class_col)),
         options=list(_QC_CLASS_LABELS),
         default=["degraded_minor", "degraded", "unroutable"],
         key="p3.cov_improve.filter",
-        help=("Default shows classes that still need operator attention. "
-              "Add Ready-to-Ship classes to browse higher-quality v2s."),
+        help=(t("ui.p3.coverage_improvement.default_shows_classes_that_still_need")),
     )
     filtered = df[df[class_col].isin(filter_choice)].reset_index(drop=True)
     st.caption(
-        f"Showing {len(filtered)} of {len(df)} v2s · "
-        f"sorted by ({class_col} desc, n_gaps_needing_dr desc)."
+        t("ui.p3.coverage_improvement.showing_n_filtered_n_df_v2s", n_filtered=(len(filtered)), n_df=(len(df)), class_col=(class_col))
     )
 
     # Sort key: worst classes first, then routes with the most DR-needed gaps
@@ -887,15 +877,15 @@ def render_coverage_improvement_tab(ctx=None, **deps) -> None:
         "n_gaps_with_tier4", "n_gaps_needing_dr",
     ]].rename(columns={
         "cov_badge": "",
-        "short_id": "route",
-        "route_name": "name",
-        "fix_category": "fix",
-        "n_stops_v1": "v1 stops",
-        "n_stops_v2": "v2 stops",
-        "n_gaps_total": "gaps",
-        "n_gaps_unresolved": "unres",
-        "n_gaps_with_tier4": "tier4 ✓",
-        "n_gaps_needing_dr": "needs DR",
+        "short_id": t("col.route"),
+        "route_name": t("coverage.col.name"),
+        "fix_category": t("coverage.col.fix"),
+        "n_stops_v1": t("coverage.col.v1_stops"),
+        "n_stops_v2": t("coverage.col.v2_stops"),
+        "n_gaps_total": t("coverage.col.gaps"),
+        "n_gaps_unresolved": t("coverage.col.unresolved"),
+        "n_gaps_with_tier4": t("coverage.col.tier4"),
+        "n_gaps_needing_dr": t("coverage.col.needs_dr"),
     })
     st.dataframe(display_df, use_container_width=True, hide_index=True, height=380)
 
@@ -904,7 +894,7 @@ def render_coverage_improvement_tab(ctx=None, **deps) -> None:
     # Per-row drill-down
     if len(filtered) > 0:
         choice = st.selectbox(
-            "Drill into a specific route",
+            t("ui.p3.coverage_improvement.drill_into_specific_route"),
             options=filtered.index.tolist(),
             format_func=lambda i: (
                 f"{filtered.loc[i,'cov_badge']} {filtered.loc[i,'short_id']} "
@@ -917,82 +907,71 @@ def render_coverage_improvement_tab(ctx=None, **deps) -> None:
 
         left, right = st.columns([2, 1])
         with right:
-            st.markdown("##### Classification")
-            badge, tooltip = _COV_BADGE.get(row["cov_class"], ("❓", ""))
+            st.markdown(t("ui.p3.coverage_improvement.classification"))
+            badge, cov_key = _COV_BADGE.get(row["cov_class"], ("❓", ""))
+            tooltip = t(f"coverage.cov_class.{cov_key}") if cov_key else ""
             st.markdown(f"### {badge}  **{row['cov_class']}**")
             st.caption(tooltip)
-            st.markdown("##### Shape + stops")
+            st.markdown(t("ui.p3.coverage_improvement.shape_stops"))
             st.markdown(
-                f"- v1 → v2 stops: **{row['n_stops_v1']} → {row['n_stops_v2']}**\n"
-                f"- Fix category: **{row['fix_category'] or '(none)'}**\n"
-                f"- Gaps total: **{row['n_gaps_total']}**\n"
-                f"- Unresolved in v2: **{row['n_gaps_unresolved']}**\n"
-                f"- Of those, have Tier 4 landmark: **{row['n_gaps_with_tier4']}**\n"
-                f"- Still need DR (3rd pass): **{row['n_gaps_needing_dr']}**\n"
-                f"- DR queued (pipeline): {row['dr_queued']}  ·  deferred: {row['dr_deferred']}"
+                t("ui.p3.coverage_improvement.v1_v2_stops_n_stops_v1", n_stops_v1=(row['n_stops_v1']), n_stops_v2=(row['n_stops_v2']), fix_category=(row['fix_category'] or '(none)'), n_gaps_total=(row['n_gaps_total']), n_gaps_unresolved=(row['n_gaps_unresolved']), n_gaps_with_tier4=(row['n_gaps_with_tier4']), n_gaps_needing_dr=(row['n_gaps_needing_dr']), dr_queued=(row['dr_queued']), dr_deferred=(row['dr_deferred']))
             )
             if row["n_gaps_needing_dr"] > 0:
                 st.warning(
-                    f"{row['n_gaps_needing_dr']} gap(s) in this v2 have no validated "
-                    f"Tier 4 landmark yet. Run a third-pass DR batch covering these "
-                    f"(see `05_triage_degraded_v2.json` + "
-                    f"`scripts/export_uncovered_dr_batch.py`)."
+                    t("ui.p3.coverage_improvement.n_gaps_needing_dr_gap_s", n_gaps_needing_dr=(row['n_gaps_needing_dr']))
                 )
             else:
                 if row["n_gaps_unresolved"] > 0:
                     st.info(
-                        "All unresolved gaps already have a validated landmark but "
-                        "the Fixer declined to close them (coord_outside_gap_buffer, "
-                        "dead_head over zone max, or similar). More DR won't help."
+                        t("ui.p3.coverage_improvement.all_unresolved_gaps_already_have_validated")
                     )
                 else:
-                    st.success("No unresolved gaps — this v2 is Fixer-optimal.")
+                    st.success(t("ui.p3.coverage_improvement.no_unresolved_gaps_this_v2_fixer"))
 
         with left:
-            st.markdown("##### v2 geometry + stops")
+            st.markdown(t("ui.p3.coverage_improvement.v2_geometry_stops"))
             _render_route_map(row)
-            st.markdown("##### Gap detail")
+            st.markdown(t("ui.p3.coverage_improvement.gap_detail"))
             st.dataframe(_gap_table(row), use_container_width=True, hide_index=True)
             _render_dr_dependency_panel_for_row(row)
 
         # Action row — approve / reject / quarantine directly from this tab.
         st.markdown("---")
-        st.markdown("##### Action on this v2")
+        st.markdown(t("ui.p3.coverage_improvement.action_this_v2"))
         operator_id, operator_username = _operator_identity()
         if operator_id is None:
             st.warning(
-                "No authenticated user — sign in from Settings before "
-                "approving. You can still preview."
+                t("ui.p3.coverage_improvement.no_authenticated_user_sign_from_settings")
             )
         else:
             qid = row["queue_id"]
             a1, a2, a3 = st.columns(3)
             with a1:
                 do_approve = st.button(
-                    "✅ APPROVE v2 → swap in place",
+                    t("ui.p3.coverage_improvement.approve_v2_swap_place"),
                     key=f"p3.cov_imp.approve.{qid}",
                     type="primary",
                     use_container_width=True,
                 )
             with a2:
                 reject_reason = st.text_input(
-                    "Reject reason",
+                    t("ui.p3.coverage_improvement.reject_reason"),
                     key=f"p3.cov_imp.reject_reason.{qid}",
-                    placeholder="why v2 is worse than v1",
+                    placeholder=t("ui.p3.coverage_improvement.why_v2_worse_than_v1"),
                 )
                 do_reject = st.button(
-                    "❌ REJECT — back to pending",
+                    t("ui.p3.coverage_improvement.reject_back_pending"),
                     key=f"p3.cov_imp.reject.{qid}",
                     use_container_width=True,
                 )
             with a3:
                 quar_reason = st.text_input(
-                    "Quarantine reason",
+                    t("ui.p3.coverage_improvement.quarantine_reason"),
                     key=f"p3.cov_imp.quar_reason.{qid}",
-                    placeholder="needs manual fix",
+                    placeholder=t("ui.p3.coverage_improvement.needs_manual_fix"),
                 )
                 do_quar = st.button(
-                    "🔒 QUARANTINE",
+                    t("ui.p3.coverage_improvement.quarantine"),
                     key=f"p3.cov_imp.quar.{qid}",
                     use_container_width=True,
                 )
@@ -1006,21 +985,18 @@ def render_coverage_improvement_tab(ctx=None, **deps) -> None:
                         dsn=_dsn(),
                     )
                     st.success(
-                        f"✅ Swap applied — v{result.version_before} → "
-                        f"v{result.version_after}. Fix report: "
-                        f"{result.fix_report_id}. Synthetic stops created: "
-                        f"{len(result.created_synthetic_node_ids)}."
+                        t("ui.p3.coverage_improvement.swap_applied_v_version_before_v", version_before=(result.version_before), version_after=(result.version_after), fix_report_id=(result.fix_report_id), n_created_synthetic_node_ids=(len(result.created_synthetic_node_ids)))
                     )
                     _load_qc_pending_v2s.clear()  # type: ignore[attr-defined]
                     st.rerun()
                 except swap_svc.SwapError as exc:
-                    st.error(f"Swap rejected by business rule: {exc}")
+                    st.error(t("ui.p3.coverage_improvement.swap_rejected_by_business_rule_exc", exc=(exc)))
                 except Exception as exc:
-                    st.exception(exc)
+                    error_state(exc, context_key="error.generic.title", retry=False)
 
             if do_reject:
                 if not (reject_reason or "").strip():
-                    st.error("Reject reason is required.")
+                    st.error(t("ui.p3.coverage_improvement.reject_reason_required"))
                 else:
                     try:
                         swap_svc.reject_v2(
@@ -1030,17 +1006,17 @@ def render_coverage_improvement_tab(ctx=None, **deps) -> None:
                             reason=reject_reason.strip(),
                             dsn=_dsn(),
                         )
-                        st.success("❌ v2 rejected — re-entry queue reset to pending.")
+                        st.success(t("ui.p3.coverage_improvement.v2_rejected_re_entry_queue_reset"))
                         _load_qc_pending_v2s.clear()  # type: ignore[attr-defined]
                         st.rerun()
                     except swap_svc.SwapError as exc:
-                        st.error(f"Reject rejected by business rule: {exc}")
+                        st.error(t("ui.p3.coverage_improvement.reject_rejected_by_business_rule_exc", exc=(exc)))
                     except Exception as exc:
-                        st.exception(exc)
+                        error_state(exc, context_key="error.generic.title", retry=False)
 
             if do_quar:
                 if not (quar_reason or "").strip():
-                    st.error("Quarantine reason is required.")
+                    st.error(t("ui.p3.coverage_improvement.quarantine_reason_required"))
                 else:
                     try:
                         swap_svc.quarantine_v2(
@@ -1050,16 +1026,16 @@ def render_coverage_improvement_tab(ctx=None, **deps) -> None:
                             reason=quar_reason.strip(),
                             dsn=_dsn(),
                         )
-                        st.success("🔒 v2 quarantined.")
+                        st.success(t("ui.p3.coverage_improvement.v2_quarantined"))
                         _load_qc_pending_v2s.clear()  # type: ignore[attr-defined]
                         st.rerun()
                     except swap_svc.SwapError as exc:
-                        st.error(f"Quarantine rejected by business rule: {exc}")
+                        st.error(t("ui.p3.coverage_improvement.quarantine_rejected_by_business_rule_exc", exc=(exc)))
                     except Exception as exc:
-                        st.exception(exc)
+                        error_state(exc, context_key="error.generic.title", retry=False)
 
     st.markdown("---")
-    st.markdown("##### How to produce a third-pass DR batch")
+    st.markdown(t("ui.p3.coverage_improvement.how_produce_third_pass_dr_batch"))
     st.code(
         "# 1. Re-triage the current degraded/unroutable cohort\n"
         "python3 -c '...'  # see workspace/unit_logs/<unit>/05_triage_degraded_v2.json\n\n"

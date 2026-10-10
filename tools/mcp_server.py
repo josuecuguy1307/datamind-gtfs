@@ -5,7 +5,16 @@ DataMind/DataMind MCP Server
 Exposes the ML DATAMIND transit pipeline database to Claude Code
 and Claude Desktop via the Model Context Protocol (MCP).
 
-All tools are READ-ONLY.  No mutations.
+All tools are READ-ONLY. No mutations. Enforced in three layers:
+  1. sessions open with default_transaction_read_only=on and a 30 s
+     statement_timeout (SESSION_OPTIONS), and every transaction is
+     SET TRANSACTION READ ONLY;
+  2. query_db accepts exactly one SELECT/WITH/VALUES/TABLE/SHOW/EXPLAIN
+     statement and rejects COPY, dblink and other side-effecting functions
+     (tools/mcp_sql_guard.py);
+  3. results are capped at 500 rows.
+This is developer/operator tooling for coding agents. It is not part of the
+Streamlit product and does not run pipeline engines.
 
 Usage (stdio transport — default for Claude Code & Desktop):
     python tools/mcp_server.py
@@ -26,24 +35,26 @@ from uuid import UUID
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# ── load .env if present ──
-_dotenv = PROJECT_ROOT / ".env"
-if _dotenv.exists():
-    for line in _dotenv.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        k, v = k.strip(), v.strip()
-        if k and k not in os.environ:
-            os.environ[k] = v
+# ── load .env (existing process variables win) before CFG is built ──
+from datamind_console.common.env import load_project_env  # noqa: E402
 
-import psycopg2
-import psycopg2.extras
-from mcp.server.fastmcp import FastMCP
+load_project_env(PROJECT_ROOT / ".env")
+
+import psycopg2  # noqa: E402
+import psycopg2.extras  # noqa: E402
+from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 # ── DB DSN resolution (mirrors datamind_console/common/config.py) ──
-from datamind_console.common.config import resolve_active_db_dsn, CFG
+from datamind_console.common.config import resolve_active_db_dsn, CFG  # noqa: E402
+
+try:  # sibling module when run as ``python tools/mcp_server.py``
+    from mcp_sql_guard import MAX_ROWS, UnsafeSQLError, validate_read_query  # type: ignore
+except ImportError:  # imported as tools.mcp_server (tests)
+    from tools.mcp_sql_guard import MAX_ROWS, UnsafeSQLError, validate_read_query  # type: ignore
+
+# Every MCP session is read-only at the *session* level (not just the first
+# transaction) and bounded in time.
+SESSION_OPTIONS = "-c default_transaction_read_only=on -c statement_timeout=30000"
 
 
 # ============================================================
@@ -52,17 +63,18 @@ from datamind_console.common.config import resolve_active_db_dsn, CFG
 
 @contextmanager
 def _db(*, readonly: bool = True) -> Iterator[psycopg2.extensions.connection]:
+    """Short-lived connection: session read-only, transaction read-only, closed on exit."""
     dsn = resolve_active_db_dsn() or CFG.db_dsn
     if not dsn:
         raise RuntimeError("No DB_DSN configured. Set DB_DSN or LOCAL_DB_DSN in .env")
-    conn = psycopg2.connect(dsn, connect_timeout=CFG.db_connect_timeout_s)
+    conn = psycopg2.connect(dsn, connect_timeout=CFG.db_connect_timeout_s, options=SESSION_OPTIONS)
     try:
         conn.autocommit = False
         if readonly:
             with conn.cursor() as cur:
                 cur.execute("SET TRANSACTION READ ONLY;")
         yield conn
-        conn.commit()
+        conn.rollback()  # nothing to keep: end the read transaction explicitly
     except Exception:
         conn.rollback()
         raise
@@ -70,17 +82,31 @@ def _db(*, readonly: bool = True) -> Iterator[psycopg2.extensions.connection]:
         conn.close()
 
 
-def _fetch_all(sql: str, params: Optional[Sequence[Any]] = None) -> List[Dict[str, Any]]:
+def _execute(cur: Any, sql: str, params: Optional[Sequence[Any]]) -> None:
+    # Only interpolate when parameters are given. Passing an empty tuple
+    # made psycopg2 parse every "%" (e.g. LIKE 'pg_temp%') and fail with
+    # "tuple index out of range"; this broke list_schemas and any query_db
+    # text containing "%".
+    if params is None:
+        cur.execute(sql)
+    else:
+        cur.execute(sql, params)
+
+
+def _fetch_all(sql: str, params: Optional[Sequence[Any]] = None, *, max_rows: Optional[int] = None) -> List[Dict[str, Any]]:
     with _db(readonly=True) as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(sql, params or ())
-            return [dict(r) for r in cur.fetchall()]
+            _execute(cur, sql, params)
+            if cur.description is None:
+                return []
+            rows = cur.fetchmany(max_rows) if max_rows else cur.fetchall()
+            return [dict(r) for r in rows]
 
 
 def _fetch_one(sql: str, params: Optional[Sequence[Any]] = None) -> Dict[str, Any]:
     with _db(readonly=True) as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(sql, params or ())
+            _execute(cur, sql, params)
             row = cur.fetchone()
             return dict(row) if row else {}
 
@@ -199,10 +225,25 @@ def phase_summary(since_days: int = 30) -> str:
 
 @mcp.tool()
 def route_catalog(limit: int = 50) -> str:
-    """List active routes from the Phase 3 global catalog view (route_review.phase3_global_catalog_v1). Shows name, operator, sector, canonical_state, stop_count."""
+    """List routes from the Phase 3 global catalog view (route_review.phase3_global_catalog_v1): name, operator, sector, canonical/suppressed state, production and approval status, prior stop count."""
     rows = _fetch_all(
         """
-        SELECT *
+        SELECT route_job_id,
+               service_route_id,
+               direction_id,
+               COALESCE(prod_route_name, service_route_name, route_family_label) AS route_name,
+               service_route_operator AS operator,
+               sector_label,
+               sector_key,
+               is_canonical_route_job,
+               is_suppressed_duplicate,
+               prod_status,
+               approval_status,
+               geometry_status,
+               step05_state,
+               step20_state,
+               prior_stop_count AS stop_count,
+               inventory_status
         FROM route_review.phase3_global_catalog_v1
         ORDER BY route_name ASC NULLS LAST
         LIMIT %s
@@ -230,7 +271,7 @@ def route_detail(route_id: str) -> str:
     if not row:
         # try raw
         row = _fetch_one(
-            "SELECT * FROM route_raw.active_route_jobs WHERE job_id::text = %s",
+            "SELECT * FROM route_raw.active_route_jobs WHERE route_id::text = %s",
             (route_id,),
         )
     return _json(row) if row else '{"error": "route not found"}'
@@ -333,14 +374,14 @@ def place_inventory(place_type: str = "", limit: int = 100) -> str:
 
 @mcp.tool()
 def extraction_runs(limit: int = 30) -> str:
-    """Recent Phase 1 Overpass extraction runs with element counts and status."""
+    """Recent Phase 1 Overpass extraction runs with element counts, runtime and status."""
     rows = _fetch_all(
         """
-        SELECT run_id, action, area_id, bbox,
-               element_count, status, error_message,
-               created_at, finished_at
+        SELECT run_id, query_id, area_id, bbox,
+               element_count, status, runtime_ms, response_bytes,
+               fetched_at
         FROM node_raw.overpass_runs
-        ORDER BY created_at DESC
+        ORDER BY fetched_at DESC NULLS LAST
         LIMIT %s
         """,
         (limit,),
@@ -352,18 +393,23 @@ def extraction_runs(limit: int = 30) -> str:
 
 @mcp.tool()
 def candidate_sets(area_id: str = "", limit: int = 30) -> str:
-    """Phase 1 node candidate sets. Filter by area_id or list recent."""
+    """Phase 1 node candidate sets (node_work.node_candidate_sets). Filter by area_id substring (stored in params_used) or list recent."""
     where = ""
     params: list = []
     if area_id.strip():
-        where = "WHERE area_id = %s"
-        params.append(area_id.strip())
+        where = "WHERE params_used->>'area_id' ILIKE %s"
+        params.append(f"%{area_id.strip()}%")
     params.append(limit)
 
     rows = _fetch_all(
         f"""
-        SELECT set_id, area_id, run_id,
-               candidate_count, status, created_at
+        SELECT node_set_id,
+               params_used->>'area_id' AS area_id,
+               params_used->>'group' AS area_group,
+               source_run_ids,
+               rank_score,
+               rank_model_ver,
+               created_at
         FROM node_work.node_candidate_sets
         {where}
         ORDER BY created_at DESC
@@ -405,14 +451,16 @@ def recent_decisions(phase: int = 0, limit: int = 50) -> str:
 
 @mcp.tool()
 def query_db(sql: str) -> str:
-    """Execute an arbitrary READ-ONLY SQL query against the datamind_ml database. The transaction is forced read-only; writes will fail. Returns up to 500 rows as JSON."""
-    # Safety: strip and reject obvious mutations
-    stripped = sql.strip().rstrip(";").strip()
-    first_word = stripped.split()[0].upper() if stripped else ""
-    if first_word in ("INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE", "CREATE", "GRANT", "REVOKE"):
-        return '{"error": "Mutation queries are not allowed. Read-only access only."}'
-
-    rows = _fetch_all(stripped + " LIMIT 500" if "LIMIT" not in stripped.upper() else stripped)
+    """Execute ONE read-only SQL statement (SELECT/WITH/VALUES/TABLE/SHOW/EXPLAIN) against the datamind_ml database. Multiple statements, COPY, dblink and other side-effecting functions are rejected; the session is read-only with a 30 s timeout. Returns up to 500 rows as JSON."""
+    try:
+        clean, add_limit = validate_read_query(sql)
+    except UnsafeSQLError as exc:
+        return _json({"error": str(exc)})
+    statement = f"{clean}\nLIMIT {MAX_ROWS}" if add_limit else clean
+    try:
+        rows = _fetch_all(statement, max_rows=MAX_ROWS)
+    except psycopg2.Error as exc:
+        return _json({"error": str(exc).strip()})
     return _json(rows)
 
 
@@ -474,20 +522,42 @@ def describe_table(schema: str, table: str) -> str:
 
 @mcp.tool()
 def ai_models() -> str:
-    """List registered AI/ML models from the ai.ai_model_registry table."""
+    """List registered models: ai.ai_model_registry (AI bot) and geo_work.model_registry (Phase 2 name ranker / place type), with how each was trained. File-based artifacts are listed in docs/CURRENT_CAPABILITIES.md."""
+    out: Dict[str, Any] = {}
     try:
-        rows = _fetch_all(
+        out["ai_model_registry"] = _fetch_all(
             """
-            SELECT model_id, model_version, phase, model_type,
-                   metrics, is_active, created_at
+            SELECT model_id, model_name, model_version, phase, artifact_path,
+                   metrics, is_active, trained_on, created_at
             FROM ai.ai_model_registry
             ORDER BY created_at DESC
             LIMIT 50
             """
         )
-        return _json(rows)
-    except Exception as e:
-        return _json({"error": str(e)})
+    except psycopg2.Error as exc:
+        out["ai_model_registry"] = {"error": str(exc).strip()}
+    try:
+        out["geo_work_model_registry"] = _fetch_all(
+            """
+            SELECT model_name,
+                   version,
+                   artifact->>'method' AS method,
+                   artifact->>'n_pos' AS n_pos,
+                   artifact->>'n_neg' AS n_neg,
+                   updated_at
+            FROM geo_work.model_registry
+            ORDER BY model_name
+            """
+        )
+    except psycopg2.Error as exc:
+        out["geo_work_model_registry"] = {"error": str(exc).strip()}
+    out["note"] = (
+        "File-based models are not registered in the database: Phase 1 STOP/POI LightGBM "
+        "(stop_poi_lgbm_v3.txt), Phase 3 on-route LightGBM (models/on_route_lgbm.txt), "
+        "Phase 4 LambdaRank (phase4_models/lgbm/v1/model.txt, empty). "
+        "See docs/CURRENT_CAPABILITIES.md for what is actually active."
+    )
+    return _json(out)
 
 
 # ── 15. Route Naming (Phase 4) ─────────────────────────────

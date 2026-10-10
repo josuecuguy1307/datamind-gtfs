@@ -6,6 +6,7 @@ from typing import Optional, Sequence, Union, Literal, List, Dict, Any
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from datamind_console.i18n import t
 
 
 ChartKind = Literal["line", "bar", "hist", "scatter"]
@@ -40,7 +41,7 @@ def line_chart(
     figsize: tuple[float, float] = (7.2, 3.6),
 ) -> None:
     if not series:
-        st.info("No data.")
+        st.info(t("ui.misc.charts.no_data"))
         return
 
     df = _safe_df(series)
@@ -73,7 +74,7 @@ def bar_chart(
     rotate_xticks: bool = True,
 ) -> None:
     if not categories or not values:
-        st.info("No data.")
+        st.info(t("ui.misc.charts.no_data"))
         return
 
     fig = _figure(figsize=figsize)
@@ -100,7 +101,7 @@ def histogram(
     figsize: tuple[float, float] = (7.2, 3.6),
 ) -> None:
     if not values:
-        st.info("No data.")
+        st.info(t("ui.misc.charts.no_data"))
         return
 
     fig = _figure(figsize=figsize)
@@ -124,7 +125,7 @@ def scatter_plot(
     figsize: tuple[float, float] = (7.2, 3.6),
 ) -> None:
     if not x or not y:
-        st.info("No data.")
+        st.info(t("ui.misc.charts.no_data"))
         return
 
     fig = _figure(figsize=figsize)

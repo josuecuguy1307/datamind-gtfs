@@ -1,43 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
-import inspect
-import importlib
+from typing import Any
 import streamlit as st
 
 from phases.phase1_nodes.client import _get_phase1_client
-
-
-def _call(
-    render_fn: Optional[Callable[..., Any]],
-    *,
-    ctx: Any,
-    **deps: Any,
-) -> Any:
-    if render_fn is None:
-        return None
-    try:
-        sig = inspect.signature(render_fn)
-        params = sig.parameters
-        if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
-            return render_fn(ctx=ctx, **deps)
-        safe_deps = {k: v for k, v in deps.items() if k in params}
-        if "ctx" in params:
-            return render_fn(ctx=ctx, **safe_deps)
-        else:
-            return render_fn(**safe_deps)
-    except Exception as e:
-        st.exception(e)
-        return None
-
-
-def _load(module_path: str, fn_name: str) -> Optional[Callable[..., Any]]:
-    try:
-        mod = importlib.import_module(module_path)
-        fn = getattr(mod, fn_name, None)
-        return fn if callable(fn) else None
-    except Exception:
-        return None
+from datamind_console.i18n import t
+from datamind_console.ui.components.states import empty_state
+from datamind_console.views.phases.panels import call_panel as _call, load_panel as _load
 
 
 def _init_phase1_state() -> None:
@@ -52,7 +21,7 @@ def render_phase1_view(*, ctx: Any, **_) -> None:
     client = _get_phase1_client("v3.newnodes.fix_json_approve2")
     deps = {"client": client}
 
-    st.subheader("Phase 1 — Nodes (Monitoring)")
+    st.subheader(t("phase1.node_sets.title"), anchor=False)
 
     # Node set picker
     w_node_sets = _load("views.phases.phase1.widgets.node_sets_table", "render_node_sets_table")
@@ -63,7 +32,7 @@ def render_phase1_view(*, ctx: Any, **_) -> None:
 
     node_set_id = ss.get("p1.node_set_id")
     if not node_set_id:
-        st.info("Select a Node Set to see details.")
+        empty_state("phase1.select_node_set")
         return
 
     st.divider()

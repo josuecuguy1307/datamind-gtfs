@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Dict, Any, Optional
 
 from phase5_gtfs.common.config import db_conn
+from phase5_gtfs.common.exportable_stops import EXPORTABLE_STOP
 from phase5_gtfs.common.time_utils import hhmmss_to_seconds, seconds_to_hhmmss
 
 
@@ -100,7 +101,7 @@ def build_trips_and_frequencies(
             )
             rows = list(cur.fetchall() or [])
             cur.execute(
-                """
+                f"""
                 SELECT
                   r.route_id::text AS route_id,
                   COALESCE(n_first.name, n_first.chosen_tags->>'name', 'Start') AS first_name,
@@ -109,12 +110,16 @@ def build_trips_and_frequencies(
                 LEFT JOIN LATERAL (
                   SELECT sid.node_id
                   FROM unnest(r.stop_node_ids) WITH ORDINALITY AS sid(node_id, seq)
+                  JOIN node_prod.nodes n ON n.node_id = sid.node_id
+                  WHERE {EXPORTABLE_STOP}
                   ORDER BY sid.seq ASC
                   LIMIT 1
                 ) first_stop ON true
                 LEFT JOIN LATERAL (
                   SELECT sid.node_id
                   FROM unnest(r.stop_node_ids) WITH ORDINALITY AS sid(node_id, seq)
+                  JOIN node_prod.nodes n ON n.node_id = sid.node_id
+                  WHERE {EXPORTABLE_STOP}
                   ORDER BY sid.seq DESC
                   LIMIT 1
                 ) last_stop ON true

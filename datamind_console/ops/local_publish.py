@@ -8,6 +8,7 @@ from typing import Any, Callable, Optional
 
 from .config import OpsConfig
 from .db_refresh import check_local_db_status, run_local_db_import, run_local_db_refresh
+from .gtfs_quarantine import refusal as quarantine_refusal
 from .gtfs_validate import validate_gtfs_zip
 from .otp_control import (
     CommandResult,
@@ -120,6 +121,14 @@ def run_local_publish(
         "steps": {},
         "errors": [],
     }
+
+    blocked = quarantine_refusal(gtfs_zip_path)
+    if blocked:
+        _log(log, blocked)
+        out["errors"].append(blocked)
+        out["steps"]["quarantine"] = {"ok": False, "reason": blocked}
+        out["finished_at"] = datetime.now(timezone.utc).isoformat()
+        return out
 
     _progress(progress, 0.02, "Validating GTFS zip")
     validation = validate_gtfs_zip(gtfs_zip_path)

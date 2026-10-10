@@ -9,6 +9,7 @@ import pydeck as pdk
 
 from datamind_console.phases.phase3_routes.client import _get_phase3_client
 from .geom import parse_linestring_wkt, line_to_points_df
+from datamind_console.i18n import t
 
 _MAP_STYLES = {
     "Colorful (Voyager)": "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
@@ -25,13 +26,13 @@ def render_route_geometry_map(*, route_id: str, geometry_candidate_id: str, key:
     c = _get_phase3_client()
     cand = c.get_geometry_candidate(UUID(geometry_candidate_id))
     if not cand:
-        st.error("Candidate not found.")
+        st.error(t("ui.p3.route_geometry_map.candidate_not_found"))
         return
 
     wkt = (cand.get("geom_wkt") or "").strip()
     line = parse_linestring_wkt(wkt)
     if not line:
-        st.warning("No geometry WKT for this candidate.")
+        st.warning(t("ui.p3.route_geometry_map.no_geometry_wkt_this_candidate"))
         return
 
     # stops if any
@@ -40,17 +41,17 @@ def render_route_geometry_map(*, route_id: str, geometry_candidate_id: str, key:
     if ssc:
         stops = c.get_stop_points_for_candidate(route_id=UUID(route_id), stop_sequence_candidate_id=UUID(str(ssc)))
 
-    st.subheader("Route geometry map")
+    st.subheader(t("ui.p3.route_geometry_map.route_geometry_map"))
     col1, col2 = st.columns(2)
     with col1:
-        st.caption("Line vertices (sample)")
+        st.caption(t("ui.p3.route_geometry_map.line_vertices_sample"))
         st.dataframe(line_to_points_df(line)[:200], use_container_width=True, height=200)
     with col2:
-        st.caption("Stops")
+        st.caption(t("ui.p3.route_geometry_map.stops"))
         if stops:
             st.dataframe(stops, use_container_width=True, height=200)
         else:
-            st.info("No stops linked (stop_sequence_candidate_id is null).")
+            st.info(t("ui.p3.route_geometry_map.no_stops_linked_stop_sequence_candidate"))
 
     # Map: render real route polyline + optional stops.
     center = line[len(line) // 2]

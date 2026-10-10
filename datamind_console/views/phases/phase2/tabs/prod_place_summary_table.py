@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 import streamlit as st
+from datamind_console.i18n import t
 
 
 def _as_kv_dict(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -25,7 +26,7 @@ def render_evidence_coverage_card(
     client: Any,
     *,
     place_set_id: Optional[str],
-    title: str = "Evidence coverage (metrics)",
+    title: Optional[str] = None,
     key_prefix: str = "p2_metrics",
 ) -> Optional[Dict[str, Any]]:
     """
@@ -39,20 +40,20 @@ def render_evidence_coverage_card(
       - a few common keys if present
       - full JSON view + key/value table fallback
     """
-    st.subheader(title)
+    st.subheader(title or t("p2.evidence_metrics_title"))
 
     if not place_set_id:
-        st.info("Select a place_set_id to view metrics.")
+        st.info(t("ui.p124.prod_place_summary_table.select_place_set_id_view_metrics"))
         return None
 
     try:
         metrics = client.get_place_set_metrics(place_set_id)
     except Exception as e:
-        st.error(f"Failed to load metrics: {e}")
+        st.error(t("ui.p124.prod_place_summary_table.failed_load_metrics_e", e=(e)))
         return None
 
     if not metrics:
-        st.warning("No metrics row found for this place_set_id.")
+        st.warning(t("ui.p124.prod_place_summary_table.no_metrics_row_found_this_place"))
         return None
 
     # Compact highlights if those keys exist (NO assumptions)
@@ -83,10 +84,10 @@ def render_evidence_coverage_card(
     cleaned = _as_kv_dict(metrics)
 
     # Two useful render modes
-    with st.expander("Metrics JSON", expanded=False):
+    with st.expander(t("ui.p124.prod_place_summary_table.metrics_json"), expanded=False):
         st.json(metrics)
 
-    with st.expander("Metrics table", expanded=True):
+    with st.expander(t("ui.p124.prod_place_summary_table.metrics_table"), expanded=True):
         # Turn dict into a tiny 2-col table without pandas dependency
         kv_rows = [{"key": k, "value": cleaned.get(k)} for k in sorted(cleaned.keys())]
         st.dataframe(kv_rows, use_container_width=True)

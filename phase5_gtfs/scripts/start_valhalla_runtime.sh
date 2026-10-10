@@ -5,7 +5,9 @@
 
 set -euo pipefail
 
-VALHALLA_DATA="${VALHALLA_DATA:-$(pwd)/valhalla_runtime_data}"
+# Repo root derived from this script; override with VALHALLA_RUNTIME_DATA.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+VALHALLA_DATA="${VALHALLA_RUNTIME_DATA:-$REPO_ROOT/valhalla_runtime_data}"
 mkdir -p "$VALHALLA_DATA"
 
 # Check if the runtime Valhalla container already exists

@@ -26,6 +26,17 @@ env/
 /workspace/*
 !/workspace/config/
 !/workspace/README.md
+# ML artifacts (optional, adjust if needed)
+models/
+# ...except the Phase 1 extractor's source package that happens to be named
+# "models": the console imports it. Its trained artifacts stay ignored.
+!phase1_nodes/datamind/services/openmaps_extractor/src/models/
+phase1_nodes/datamind/services/openmaps_extractor/src/models/**
+!phase1_nodes/datamind/services/openmaps_extractor/src/models/**/
+!phase1_nodes/datamind/services/openmaps_extractor/src/models/**/*.py
+phase1_nodes/datamind/services/openmaps_extractor/src/models/**/__pycache__/
+data/
+logs/
 
 
 # Dumps y copias de la base (pueden pesar GB y contener datos reales)

@@ -2,45 +2,15 @@
 """Phase 4 — Naming (Monitoring)"""
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
-import inspect
-import importlib
+from typing import Any
 import os
 import streamlit as st
 
 from datamind_console.phases.phase4_naming.client import _get_phase4_client
 from datamind_console.db import console_repo
-
-
-def _call(
-    render_fn: Optional[Callable[..., Any]],
-    *,
-    ctx: Any,
-    **deps: Any,
-) -> Any:
-    if render_fn is None:
-        return None
-    try:
-        sig = inspect.signature(render_fn)
-        params = sig.parameters
-        if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
-            return render_fn(ctx=ctx, **deps)
-        safe_deps = {k: v for k, v in deps.items() if k in params}
-        if "ctx" in params:
-            return render_fn(ctx=ctx, **safe_deps)
-        return render_fn(**safe_deps)
-    except Exception as e:
-        st.exception(e)
-        return None
-
-
-def _load(module_path: str, fn_name: str) -> Optional[Callable[..., Any]]:
-    try:
-        mod = importlib.import_module(module_path)
-        fn = getattr(mod, fn_name, None)
-        return fn if callable(fn) else None
-    except Exception:
-        return None
+from datamind_console.i18n import t
+from datamind_console.ui.components.states import empty_state
+from datamind_console.views.phases.panels import call_panel as _call, load_panel as _load
 
 
 def _init_phase4_state() -> None:
@@ -81,17 +51,11 @@ def render_phase4_view(*, ctx: Any, analytics: Any = None, audit: Any = None, **
     local_only = os.getenv("DATAMIND_LOCAL_ONLY_MODE", "").strip().lower() in {"1", "true", "t", "yes", "y", "on"}
     local_dsn = os.getenv("LOCAL_DB_DSN") or os.getenv("DATAMIND_LOCAL_DB_DSN") or os.getenv("DB_DSN_LOCAL")
     if local_only and not local_dsn:
-        st.subheader("Phase 4 — Naming (Monitoring)")
-        st.info(
-            "Phase 4 data is unavailable: configure LOCAL_DB_DSN for the local-only session. "
-            "Remote database fallbacks are disabled."
-        )
+        empty_state("phase.local_dsn_missing", icon=":material/cloud_off:")
         return
 
     client = _get_phase4_client()
     console = console_repo
-
-    st.subheader("Phase 4 — Naming (Monitoring)")
 
     deps = {
         "analytics": analytics,
@@ -101,7 +65,7 @@ def render_phase4_view(*, ctx: Any, analytics: Any = None, audit: Any = None, **
     }
 
     # --- Route Context Selector ---
-    st.markdown("### Logical Route Context")
+    st.subheader(t("phase4.context.title"), anchor=False)
     try:
         bindings = client.list_service_route_direction_bindings(limit=500) or []
     except Exception:
@@ -157,7 +121,7 @@ def render_phase4_view(*, ctx: Any, analytics: Any = None, audit: Any = None, **
                 return f"{d} | route:{rid[:8] if rid else '-'} | {status}"
 
             chosen_d = st.radio(
-                "Direction",
+                t("ui.p124.phase4.direction"),
                 options=d_opts,
                 index=d_opts.index(current_d) if current_d in d_opts else 0,
                 format_func=_d_label,
@@ -168,9 +132,9 @@ def render_phase4_view(*, ctx: Any, analytics: Any = None, audit: Any = None, **
             chosen_route_id = str((drows.get(int(chosen_d)) or {}).get("route_id") or "").strip()
             if chosen_route_id:
                 ss["phase4.route_id"] = chosen_route_id
-                st.caption(f"Active route_id from direction: `{chosen_route_id}`")
+                st.caption(t("ui.p124.phase4.active_route_id_from_direction_chosen", chosen_route_id=(chosen_route_id)))
         else:
-            st.info("Selected service_route_id has no bound direction route_id.")
+            empty_state("phase4.context.no_direction")
 
     st.divider()
 
@@ -202,7 +166,7 @@ def render_phase4_view(*, ctx: Any, analytics: Any = None, audit: Any = None, **
             _call(w_detail, ctx=ctx, route_id=route_id, key="p4_detail", **deps)
             _call(w_insights, ctx=ctx, route_id=route_id, key="p4_insights", **deps)
         else:
-            st.info("Pick a route_id (Queue/Search) to see details.")
+            empty_state("phase4.context.pick_route")
 
     st.divider()
 

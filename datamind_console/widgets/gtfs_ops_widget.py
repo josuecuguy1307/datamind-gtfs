@@ -23,6 +23,10 @@ from datamind_console.ops.gtfs_validate import validate_gtfs_zip
 from datamind_console.ops.local_api_status import run_all_local_server_api_checks
 from datamind_console.ops.local_publish import check_local_status, run_local_publish
 from datamind_console.services.workspace_context_service import active_work
+from datamind_console.i18n import t
+from datamind_console.ops import gtfs_canonical_validator as canonical_validator
+from datamind_console.ops import gtfs_quarantine
+from datamind_console.ui.formatting import format_number
 
 
 LogFn = Callable[[str], None]
@@ -108,6 +112,43 @@ def _resolve_gtfs_file(uploaded: Any, cfg: OpsConfig) -> Optional[Path]:
     return p
 
 
+def _upload_token(uploaded: Any) -> str:
+    return f"{getattr(uploaded, 'file_id', None) or uploaded.name}:{getattr(uploaded, 'size', '')}"
+
+
+def _resolve_gtfs_file_once(uploaded: Any, cfg: OpsConfig) -> Optional[Path]:
+    """Like ``_resolve_gtfs_file`` but saves each upload only once.
+
+    ``_save_uploaded_gtfs`` writes a new timestamped copy on every call, so
+    each action click (validate, validator, publish) used to store another
+    copy of the same upload.
+    """
+    if uploaded is None:
+        return _resolve_gtfs_file(None, cfg)
+    key = _work_state_key("ops.gtfs.saved_upload")
+    token = _upload_token(uploaded)
+    cached = st.session_state.get(key) or {}
+    if cached.get("token") == token and Path(str(cached.get("path") or "")).is_file():
+        return Path(cached["path"])
+    path = _save_uploaded_gtfs(uploaded, cfg)
+    st.session_state[key] = {"token": token, "path": str(path)}
+    return path
+
+
+def _known_current_path(uploaded: Any) -> Optional[str]:
+    """Path of the file the operator is looking at, without saving anything."""
+    if uploaded is not None:
+        cached = st.session_state.get(_work_state_key("ops.gtfs.saved_upload")) or {}
+        return cached.get("path") if cached.get("token") == _upload_token(uploaded) else None
+    raw = str(st.session_state.get(_work_state_key("ops.gtfs.last_file_path")) or "").strip()
+    return raw or None
+
+
+def _record_structure_result(path: Path, report: dict[str, Any]) -> None:
+    results = st.session_state.setdefault(_work_state_key("ops.gtfs.structure_results"), {})
+    results[str(path)] = {"ok": bool(report.get("ok")), "errors": list(report.get("errors") or [])[:20]}
+
+
 _GTFS_BUNDLE_FILES = (
     "agency.txt",
     "stops.txt",
@@ -148,7 +189,7 @@ def _auto_pack_gtfs_from_dir(source_dir: Path, cfg: OpsConfig) -> Optional[Path]
 
 
 def _resolve_gtfs_for_aws_full_deploy(uploaded: Any, cfg: OpsConfig) -> tuple[Optional[Path], str]:
-    direct = _resolve_gtfs_file(uploaded, cfg)
+    direct = _resolve_gtfs_file_once(uploaded, cfg)
     if direct is not None:
         return direct, "uploaded_or_cached"
 
@@ -198,6 +239,7 @@ def _resolve_gtfs_for_aws_full_deploy(uploaded: Any, cfg: OpsConfig) -> tuple[Op
 def _ensure_validated_gtfs(path: Path) -> bool:
     validation = validate_gtfs_zip(path)
     st.session_state[_work_state_key("ops.gtfs.last_validation")] = validation
+    _record_structure_result(path, validation)
 
     if validation.get("ok"):
         st.session_state[_work_state_key("ops.gtfs.last_checksum")] = str(validation.get("checksum_sha256") or "")
@@ -241,10 +283,10 @@ def _run_action(
 
     ok = bool(result.get("ok"))
     if ok:
-        status_box.success(f"{label}: completed")
+        status_box.success(t("ui.misc.gtfs_ops.label_completed", label=(label)))
         progress_bar.progress(100)
     else:
-        status_box.error(f"{label}: failed")
+        status_box.error(t("ui.misc.gtfs_ops.label_failed", label=(label)))
 
     return result
 
@@ -252,7 +294,7 @@ def _run_action(
 def _render_missing(title: str, missing: list[str]) -> None:
     if not missing:
         return
-    st.warning(f"{title}: Not connected. Fix config: {', '.join(missing)}")
+    st.warning(t("ui.misc.gtfs_ops.title_not_connected_fix_config_join", title=(title), join=(', '.join(missing))))
 
 
 def _status_connected(kind: str, payload: Any) -> bool:
@@ -273,25 +315,25 @@ def _render_connectivity_tags(*, local_db: Any, local_otp: Any, aws_otp: Any, aw
         for item in (local_db, local_otp, aws_otp, aws_db)
     )
     if not has_any_status:
-        st.info("No status snapshot yet. Run `Check LOCAL status` and/or `Check AWS status`.")
+        st.info(t("ui.misc.gtfs_ops.no_status_snapshot_yet_run_check"))
         return
 
     tags = [
-        ("Local DB", _status_connected("local_db", local_db)),
-        ("Local OTP", _status_connected("local_otp", local_otp)),
-        ("AWS OTP", _status_connected("aws_otp", aws_otp)),
-        ("AWS DB", _status_connected("aws_db", aws_db)),
+        (t("ops.conn.local_db"), _status_connected("local_db", local_db)),
+        (t("ops.conn.local_otp"), _status_connected("local_otp", local_otp)),
+        (t("ops.conn.aws_otp"), _status_connected("aws_otp", aws_otp)),
+        (t("ops.conn.aws_db"), _status_connected("aws_db", aws_db)),
     ]
     cols = st.columns(4)
     for idx, (name, ok) in enumerate(tags):
         with cols[idx]:
             if ok:
-                st.success(f"{name}: Connected")
+                st.success(t("ui.misc.gtfs_ops.name_connected", name=(name)))
             else:
-                st.warning(f"{name}: Not connected")
+                st.warning(t("ui.misc.gtfs_ops.name_not_connected", name=(name)))
 
     if any(not ok for _, ok in tags):
-        st.warning("Connectivity issue detected. Fix config/host/service and run status checks again.")
+        st.warning(t("ui.misc.gtfs_ops.connectivity_issue_detected_fix_config_host"))
 
 
 def _short_json(data: Any) -> Any:
@@ -300,6 +342,38 @@ def _short_json(data: Any) -> Any:
     if data is None:
         return {}
     return {"value": data}
+
+
+def _status_block(title: str, payload: Any) -> None:
+    """One status entry: 'not checked' when empty, raw payload behind an expander."""
+    st.markdown(f"**{title}**")
+    if not payload:
+        st.caption(t("gtfs.status.not_checked"))
+        return
+    with st.expander(t("gtfs.status.details"), expanded=False):
+        st.json(_short_json(payload))
+
+
+def _api_preflight_block(title: str, result: Any, *, hint_key: str) -> None:
+    st.markdown(f"**{title}**")
+    if not (isinstance(result, dict) and result):
+        st.caption(t(hint_key))
+        return
+    if result.get("ok"):
+        st.success(t("gtfs.status.api_ok"), icon=":material/check_circle:")
+    else:
+        st.warning(t("gtfs.status.api_failed"), icon=":material/warning:")
+    with st.expander(t("gtfs.status.details"), expanded=not result.get("ok")):
+        st.json(_short_json(result))
+
+
+def _canonical_passed_for(path: Path) -> bool:
+    """True when the MobilityData validator passed on this exact resolved file in this session."""
+    state = st.session_state.get(_work_state_key("ops.gtfs.canonical_result")) or {}
+    try:
+        return state.get("status") == "pass" and Path(str(state.get("path"))).resolve() == Path(path).resolve()
+    except (OSError, TypeError):
+        return False
 
 
 def _local_api_guard_ok(status: Any) -> bool:
@@ -325,15 +399,15 @@ def _render_aws_deploy_checklist(cfg: OpsConfig) -> None:
     remote_root = (cfg.aws_backend_remote_dir or cfg.aws_transportapp_dir or "/opt/gtfs_app").rstrip("/")
     compose_file = f"{remote_root}/docker-compose.yaml"
 
-    st.markdown("#### Safe AWS Deploy Checklist")
-    with st.expander("Show checklist (stop/remove, replace, keep, health checks)", expanded=False):
+    st.markdown(t("ui.misc.gtfs_ops.safe_aws_deploy_checklist"))
+    with st.expander(t("ui.misc.gtfs_ops.show_checklist_stop_remove_replace_keep"), expanded=False):
         st.markdown(
             "\n".join(
                 [
-                    "1. Stop only app containers before deploy (`backend`, `otp`), keep data services running when possible.",
-                    "2. Replace only app/runtime folders (`BACKEND`, `config`, `init`, `scripts`, `otp/otp.jar`, `otp/otp-data/routers/default`, optional `gtfs_data/osm_data`).",
-                    "3. Do **not** delete Postgres/Redis containers, data directories, or named volumes (`pgdata`, `redisdata`).",
-                    "4. Start app containers again and run post-deploy checks locally on EC2 and on public endpoints.",
+                    t("ops.checklist.1"),
+                    t("ops.checklist.2"),
+                    t("ops.checklist.3"),
+                    t("ops.checklist.4"),
                 ]
             )
         )
@@ -355,24 +429,75 @@ def _render_aws_deploy_checklist(cfg: OpsConfig) -> None:
         )
 
 
+def _render_validation_layers(current_path: Optional[Path]) -> None:
+    """What has (and has not) been checked for the current file."""
+    ss = st.session_state
+    structure_results = ss.get(_work_state_key("ops.gtfs.structure_results")) or {}
+    canonical = ss.get(_work_state_key("ops.gtfs.canonical_result")) or {}
+    same_file = lambda p: bool(current_path is not None and p and str(p) == str(current_path))  # noqa: E731
+
+    structure = structure_results.get(str(current_path)) if current_path is not None else None
+    structure_state = ("pass" if structure.get("ok") else "fail") if structure else "not_run"
+    canonical_state = canonical.get("status") if same_file(canonical.get("path")) else "not_run"
+    if canonical_state == "error":
+        canonical_state = "fail"
+
+    rows = [
+        ("structure", structure_state),
+        ("quality", "not_applicable"),
+        ("canonical", canonical_state),
+    ]
+    with st.container(horizontal=True, gap="small"):
+        for layer, state in rows:
+            tone = {"pass": "green", "fail": "red", "not_run": "gray", "not_applicable": "gray"}.get(state, "gray")
+            st.badge(f"{t(f'gtfs.layer.{layer}')} · {t(f'gtfs.layer_state.{state}')}", color=tone)
+    st.caption(t("gtfs.layer.quality_note"))
+    blocked = gtfs_quarantine.refusal(current_path) if current_path is not None and current_path.exists() else None
+    if blocked:
+        st.error(t("gtfs.quarantine.blocked", reason=blocked), icon=":material/block:")
+        return
+    ready = structure_state == "pass" and canonical_state == "pass"
+    if ready:
+        st.success(t("gtfs.publish_ready.yes"), icon=":material/task_alt:")
+    else:
+        st.info(t("gtfs.publish_ready.no"), icon=":material/info:")
+
+    if canonical and same_file(canonical.get("path")):
+        counts = canonical.get("counts") or {}
+        with st.expander(t("gtfs.canonical.details", errors=format_number(counts.get("ERROR", 0)), warnings=format_number(counts.get("WARNING", 0))), expanded=canonical.get("status") != "pass"):
+            if canonical.get("status") == "error":
+                st.error(t("gtfs.canonical.error"))
+                st.code(canonical.get("stderr_tail") or "", language="text")
+            if canonical.get("notices"):
+                st.dataframe(
+                    [{t("col.notice"): n.get("code"), t("col.severity"): n.get("severity"), t("col.count"): n.get("total")} for n in canonical["notices"]],
+                    hide_index=True, width="stretch",
+                )
+            st.caption(t("gtfs.canonical.version", version=canonical.get("version") or "—", at=canonical.get("at") or "—"))
+            html_path = canonical.get("html_report")
+            if html_path and Path(html_path).is_file():
+                st.download_button(
+                    t("gtfs.canonical.download_report"),
+                    data=Path(html_path).read_bytes(),
+                    file_name=f"gtfs-validator-report-{Path(str(current_path)).stem}.html",
+                    mime="text/html",
+                    icon=":material/download:",
+                    key="ops.gtfs.canonical.download",
+                )
+
+
 def render_gtfs_ops_widget() -> None:
     _init_state()
     ss = st.session_state
     cfg = load_ops_config()
 
-    st.subheader("GTFS Ops (Local + AWS)")
-    st.caption(
-        "Upload one GTFS ZIP, publish locally, run full AWS deploy (runtime + GTFS + DB + OTP), "
-        "and track status/logs from one panel. "
-        "For AWS full deploy, GTFS upload is optional if your local bundle is already updated."
-    )
     work = active_work(ss)
     if work:
-        st.info(f"Active GTFS work: {work['name']}. Uploads are isolated from other selected works.")
+        st.caption(t("gtfs.work_active", name=work["name"]))
     else:
-        st.info("No regional profile is required to validate a GTFS ZIP. Create/select a work only when you need to retain an input or results destination.")
+        st.caption(t("gtfs.work_none"))
 
-    with st.expander("Detected paths/config", expanded=False):
+    with st.expander(t("gtfs.config_paths"), expanded=False, icon=":material/settings_ethernet:"):
         st.write(
             {
                 "transportapp_root": str(cfg.transportapp_root) if cfg.transportapp_root else None,
@@ -410,72 +535,123 @@ def render_gtfs_ops_widget() -> None:
     top_missing_aws_full = _merge_missing(top_missing_aws, top_missing_backend)
     if top_missing_local or top_missing_aws_full:
         st.info(
-            "Missing config detected. "
-            f"Local: {', '.join(top_missing_local) if top_missing_local else 'OK'} | "
-            f"AWS full deploy: {', '.join(top_missing_aws_full) if top_missing_aws_full else 'OK'}"
+            t(
+                "gtfs.config_missing",
+                local=", ".join(top_missing_local) if top_missing_local else "OK",
+                aws=", ".join(top_missing_aws_full) if top_missing_aws_full else "OK",
+            ),
+            icon=":material/settings_alert:",
         )
 
-    upload_key = _work_state_key("ops.gtfs.upload")
-    uploaded = st.file_uploader("GTFS zip (.zip)", type=["zip"], key=upload_key)
-    if uploaded is not None:
-        st.caption(f"Selected upload: `{uploaded.name}` ({uploaded.size} bytes)")
-
-    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-
-    with c1:
-        do_validate = st.button("Validate GTFS", use_container_width=True, key="ops.gtfs.validate")
-    with c2:
-        do_local = st.button("Run LOCAL publish", use_container_width=True, key="ops.gtfs.local.publish")
-    with c3:
-        do_aws_full = st.button("Run AWS full deploy", use_container_width=True, key="ops.gtfs.aws.full")
-    with c4:
-        do_local_status = st.button("Check LOCAL status", use_container_width=True, key="ops.gtfs.local.status")
-    with c5:
-        do_aws_status = st.button("Check AWS status", use_container_width=True, key="ops.gtfs.aws.status")
-    with c6:
-        do_aws_api_checks = st.button("Run ALL AWS APIs", use_container_width=True, key="ops.gtfs.aws.apis")
-    with c7:
-        do_local_api_checks = st.button("Run ALL APIs", use_container_width=True, key="ops.gtfs.local.apis")
-
-    confirm_aws_full = st.checkbox(
-        "Are you sure? (required before AWS full deploy)",
-        key="ops.gtfs.aws.full.confirm",
-        value=False,
-    )
-    allow_without_local_api = st.checkbox(
-        "Allow AWS actions without LOCAL API check pass (not recommended)",
-        key="ops.gtfs.aws.allow_without_local_api",
-        value=False,
-    )
-
-    _render_aws_deploy_checklist(cfg)
-
-    if do_validate:
-        path = _resolve_gtfs_file(uploaded, cfg)
-        if path is None:
-            st.warning("Upload a GTFS zip first or reuse the last uploaded file.")
-        else:
-            result = _run_action(
-                scope="local",
-                label="Validate GTFS",
-                action=lambda log, progress: _validate_action(path, log, progress),
+    # ---- 1 · Validate the feed -------------------------------------------
+    with st.container(border=True):
+        st.subheader(t("gtfs.validate.title"), anchor=False)
+        st.caption(t("gtfs.validate.caption"))
+        upload_key = _work_state_key("ops.gtfs.upload")
+        uploaded = st.file_uploader(t("gtfs.upload"), type=["zip"], key=upload_key)
+        if uploaded is not None:
+            st.caption(t("gtfs.upload_selected", name=uploaded.name, size=format_number(int(uploaded.size))))
+        v1, v2 = st.columns(2)
+        with v1:
+            do_validate = st.button(t("gtfs.structure.run"), use_container_width=True, key="ops.gtfs.validate", icon=":material/rule:")
+        with v2:
+            avail = canonical_validator.availability()
+            do_canonical = st.button(
+                t("gtfs.canonical.run"), use_container_width=True, key="ops.gtfs.canonical",
+                icon=":material/verified:", disabled=not avail.ready,
+                help=None if avail.ready else t("gtfs.canonical.unavailable", missing=", ".join(avail.missing)),
             )
-            ss.setdefault("ops.status", {})["gtfs_validation"] = result
+        if do_canonical:
+            current_path = _resolve_gtfs_file_once(uploaded, cfg)
+            if current_path is None:
+                st.warning(t("gtfs.need_upload"))
+            else:
+                with st.spinner(t("gtfs.canonical.running"), show_time=True):
+                    vres = canonical_validator.run_validator(Path(current_path))
+                ss[_work_state_key("ops.gtfs.canonical_result")] = {
+                    "path": str(current_path),
+                    "status": vres.status,
+                    "counts": vres.counts,
+                    "notices": vres.notices[:25],
+                    "version": vres.validator_version,
+                    "html_report": str(vres.html_report) if vres.html_report else None,
+                    "stderr_tail": vres.stderr_tail,
+                    "at": _now_iso(),
+                }
+                _append_log("local", f"MobilityData validator: {vres.status} counts={vres.counts}")
+        if do_validate:
+            path = _resolve_gtfs_file_once(uploaded, cfg)
+            if path is None:
+                st.warning(t("gtfs.need_upload"))
+            else:
+                result = _run_action(
+                    scope="local",
+                    label=t("ops.action.validate"),
+                    action=lambda log, progress: _validate_action(path, log, progress),
+                )
+                ss.setdefault("ops.status", {})["gtfs_validation"] = result
+        current_known = _known_current_path(uploaded)
+        _render_validation_layers(Path(current_known) if current_known else None)
+
+    # ---- 2 · Publish ------------------------------------------------------
+    with st.container(border=True):
+        st.subheader(t("gtfs.publish.title"), anchor=False)
+        st.caption(t("gtfs.publish.caption"))
+        canonical_state = ss.get(_work_state_key("ops.gtfs.canonical_result")) or {}
+        current_known = _known_current_path(uploaded)
+        canonical_passed = bool(
+            current_known is not None
+            and canonical_state.get("path") == current_known
+            and canonical_state.get("status") == "pass"
+        )
+        ack_unvalidated = True
+        if not canonical_passed:
+            ack_unvalidated = st.checkbox(t("gtfs.publish.ack_unvalidated"), key="ops.gtfs.local.ack_unvalidated", value=False)
+        p1, p2 = st.columns(2)
+        with p1:
+            do_local = st.button(
+                t("gtfs.publish.local"), type="primary", use_container_width=True, key="ops.gtfs.local.publish",
+                icon=":material/publish:", disabled=not ack_unvalidated,
+            )
+        with p2:
+            do_aws_full = st.button(t("gtfs.publish.aws"), use_container_width=True, key="ops.gtfs.aws.full", icon=":material/cloud_upload:")
+        confirm_aws_full = st.checkbox(t("gtfs.publish.aws_confirm"), key="ops.gtfs.aws.full.confirm", value=False)
+        allow_without_local_api = st.checkbox(t("gtfs.publish.aws_without_api"), key="ops.gtfs.aws.allow_without_local_api", value=False)
+        _render_aws_deploy_checklist(cfg)
+
+    # ---- 3 · Environment status ------------------------------------------
+    with st.container(border=True):
+        st.subheader(t("gtfs.env.title"), anchor=False)
+        st.caption(t("gtfs.env.caption"))
+        e1, e2, e3, e4 = st.columns(4)
+        with e1:
+            do_local_status = st.button(t("gtfs.env.local_status"), use_container_width=True, key="ops.gtfs.local.status")
+        with e2:
+            do_local_api_checks = st.button(t("gtfs.env.local_apis"), use_container_width=True, key="ops.gtfs.local.apis")
+        with e3:
+            do_aws_status = st.button(t("gtfs.env.aws_status"), use_container_width=True, key="ops.gtfs.aws.status")
+        with e4:
+            do_aws_api_checks = st.button(t("gtfs.env.aws_apis"), use_container_width=True, key="ops.gtfs.aws.apis")
 
     if do_local:
         missing = missing_for_local_publish(cfg)
         if missing:
-            _render_missing("LOCAL publish", missing)
+            _render_missing(t("ops.action.local_publish"), missing)
+        elif not ack_unvalidated:
+            st.warning(t("gtfs.publish.ack_required"))
         else:
-            path = _resolve_gtfs_file(uploaded, cfg)
+            path = _resolve_gtfs_file_once(uploaded, cfg)
+            blocked = gtfs_quarantine.refusal(path) if path is not None else None
             if path is None:
-                st.warning("Upload a GTFS zip first or reuse the last uploaded file.")
+                st.warning(t("gtfs.need_upload"))
+            elif blocked:
+                st.error(t("gtfs.quarantine.blocked", reason=blocked), icon=":material/block:")
             elif not _ensure_validated_gtfs(path):
-                st.error("Validation failed. Fix GTFS zip before local publish.")
+                st.error(t("gtfs.publish.structure_failed"))
             else:
                 result = _run_action(
                     scope="local",
-                    label="LOCAL publish",
+                    label=t("ops.action.local_publish"),
                     action=lambda log, progress: run_local_publish(cfg, path, log=log, progress=progress),
                 )
                 if result.get("ok"):
@@ -484,28 +660,33 @@ def render_gtfs_ops_widget() -> None:
 
     if do_aws_full:
         if not confirm_aws_full:
-            st.warning("Check the confirmation box before running AWS full deploy.")
+            st.warning(t("gtfs.publish.aws_confirm_required"))
         elif (not allow_without_local_api) and (not _local_api_guard_ok(ss.get("ops.status") or {})):
-            st.warning("Run `ALL APIs` first and get `STATUS_AWESOME` before AWS full deploy.")
+            st.warning(t("gtfs.publish.aws_api_required"))
         else:
             missing = _merge_missing(missing_for_aws_publish(cfg), missing_for_aws_backend_push(cfg))
             if missing:
-                _render_missing("AWS full deploy", missing)
+                _render_missing(t("ops.action.aws_full_deploy"), missing)
             else:
                 path, source_kind = _resolve_gtfs_for_aws_full_deploy(uploaded, cfg)
+                blocked = gtfs_quarantine.refusal(path) if path is not None else None
                 if path is None:
                     st.error(
-                        "AWS full deploy could not find GTFS in local bundle. "
-                        "Run LOCAL publish first or upload one GTFS zip."
+                        t("ui.misc.gtfs_ops.aws_full_deploy_could_not_find")
                     )
+                elif blocked:
+                    st.error(t("gtfs.quarantine.blocked", reason=blocked), icon=":material/block:")
+                elif not (_canonical_passed_for(path) or ack_unvalidated):
+                    # The auto-detected bundle is not the file the checkbox above was shown for.
+                    st.warning(t("gtfs.publish.ack_required"))
                 elif not _ensure_validated_gtfs(path):
-                    st.error("Validation failed. Fix GTFS zip before AWS full deploy.")
+                    st.error(t("gtfs.publish.structure_failed"))
                 else:
                     if source_kind != "uploaded_or_cached":
-                        st.caption(f"AWS full deploy using auto-detected local GTFS bundle: `{path}`")
+                        st.caption(t("ui.misc.gtfs_ops.aws_full_deploy_using_auto_detected", path=(path)))
                     result = _run_action(
                         scope="aws",
-                        label="AWS full deploy",
+                        label=t("ops.action.aws_full_deploy"),
                         action=lambda log, progress: _aws_full_deploy_action(cfg, path, log, progress),
                     )
                     ss["ops.aws.last_run"] = _now_iso()
@@ -523,11 +704,11 @@ def render_gtfs_ops_widget() -> None:
     if do_local_status:
         missing = missing_for_local_status(cfg)
         if missing:
-            _render_missing("LOCAL status", missing)
+            _render_missing(t("ops.action.local_status"), missing)
         else:
             result = _run_action(
                 scope="local",
-                label="Check LOCAL status",
+                label=t("ops.action.check_local_status"),
                 action=lambda log, progress: _local_status_action(cfg, log, progress),
             )
             ss.setdefault("ops.status", {}).update(result)
@@ -535,11 +716,11 @@ def render_gtfs_ops_widget() -> None:
     if do_aws_status:
         missing = missing_for_aws_status(cfg)
         if missing:
-            _render_missing("AWS status", missing)
+            _render_missing(t("ops.action.aws_status"), missing)
         else:
             result = _run_action(
                 scope="aws",
-                label="Check AWS status",
+                label=t("ops.action.check_aws_status"),
                 action=lambda log, progress: _aws_status_action(cfg, log, progress),
             )
             ss.setdefault("ops.status", {}).update(result)
@@ -547,7 +728,7 @@ def render_gtfs_ops_widget() -> None:
     if do_local_api_checks:
         result = _run_action(
             scope="local",
-            label="Run ALL APIs",
+            label=t("ops.action.run_local_apis"),
             action=lambda log, progress: _local_api_checks_action(cfg, log, progress),
         )
         ss["ops.local.api.last_run"] = _now_iso()
@@ -556,53 +737,43 @@ def render_gtfs_ops_widget() -> None:
     if do_aws_api_checks:
         missing = missing_for_aws_status(cfg)
         if missing:
-            _render_missing("ALL AWS APIs", missing)
+            _render_missing(t("ops.action.aws_apis"), missing)
         else:
             result = _run_action(
                 scope="aws",
-                label="Run ALL AWS APIs",
+                label=t("ops.action.run_aws_apis"),
                 action=lambda log, progress: _aws_api_checks_action(cfg, log, progress),
             )
             ss["ops.aws.api.last_run"] = _now_iso()
             ss.setdefault("ops.status", {})["aws_api_checks"] = result
 
-    st.markdown("#### Status")
+    st.markdown(f"#### {t('gtfs.status.title')}")
     st.caption(
-        "Last local publish: "
-        f"`{ss.get('ops.local.last_run') or '-'}` | "
-        f"Last local API check: `{ss.get('ops.local.api.last_run') or '-'}` | "
-        f"Last AWS API check: `{ss.get('ops.aws.api.last_run') or '-'}` | "
-        f"Last AWS full deploy: `{ss.get('ops.aws.last_run') or '-'}`"
+        t(
+            "gtfs.status.last_runs",
+            local=ss.get("ops.local.last_run") or "—",
+            local_api=ss.get("ops.local.api.last_run") or "—",
+            aws_api=ss.get("ops.aws.api.last_run") or "—",
+            aws=ss.get("ops.aws.last_run") or "—",
+        )
     )
 
     status = ss.get("ops.status") or {}
     s1, s2 = st.columns(2)
     with s1:
-        st.markdown("**Local DB status**")
         local_db = status.get("local_db") or status.get("local_publish", {}).get("steps", {}).get("status", {}).get("local_db")
-        st.json(_short_json(local_db))
+        _status_block(t("gtfs.status.local_db"), local_db)
 
-        st.markdown("**Local OTP status**")
         local_otp = status.get("local_otp") or status.get("local_publish", {}).get("steps", {}).get("status", {}).get("local_otp")
-        st.json(_short_json(local_otp))
+        _status_block(t("gtfs.status.local_otp"), local_otp)
 
-        st.markdown("**Local API preflight**")
         local_api = status.get("local_api_checks")
-        if isinstance(local_api, dict) and local_api:
-            if local_api.get("ok"):
-                st.success("STATUS_AWESOME: all API checks passed. One failure would set run-all to false.")
-            else:
-                st.warning("Run ALL APIs is false. At least one endpoint failed; review `failed_checks` and `checks` before AWS actions.")
-            st.json(_short_json(local_api))
-        else:
-            st.info("Run `ALL APIs` before AWS full deploy.")
+        _api_preflight_block(t("gtfs.status.local_api"), local_api, hint_key="gtfs.status.local_api_hint")
 
     with s2:
-        st.markdown("**AWS full deploy**")
         aws_full = status.get("aws_full_deploy")
-        st.json(_short_json(aws_full))
+        _status_block(t("gtfs.status.aws_full"), aws_full)
 
-        st.markdown("**AWS OTP status**")
         aws_otp = (
             status.get("aws_otp")
             or status.get("aws_status", {}).get("aws_otp")
@@ -610,9 +781,8 @@ def render_gtfs_ops_widget() -> None:
             or status.get("aws_full_deploy", {}).get("steps", {}).get("aws_publish", {}).get("steps", {}).get("status", {}).get("aws_otp")
             or status.get("aws_publish", {}).get("steps", {}).get("status", {}).get("aws_otp")
         )
-        st.json(_short_json(aws_otp))
+        _status_block(t("gtfs.status.aws_otp"), aws_otp)
 
-        st.markdown("**AWS DB status**")
         aws_db = (
             status.get("aws_db")
             or status.get("aws_status", {}).get("aws_db")
@@ -620,27 +790,18 @@ def render_gtfs_ops_widget() -> None:
             or status.get("aws_full_deploy", {}).get("steps", {}).get("aws_publish", {}).get("steps", {}).get("status", {}).get("aws_db")
             or status.get("aws_publish", {}).get("steps", {}).get("status", {}).get("aws_db")
         )
-        st.json(_short_json(aws_db))
+        _status_block(t("gtfs.status.aws_db"), aws_db)
 
-        st.markdown("**AWS runtime deploy**")
         aws_backend = (
             status.get("aws_backend")
             or status.get("aws_full_deploy", {}).get("aws_backend")
             or status.get("aws_full_deploy", {}).get("steps", {}).get("aws_runtime", {}).get("steps", {}).get("backend_status")
             or status.get("aws_backend_push", {}).get("steps", {}).get("backend_status")
         )
-        st.json(_short_json(aws_backend))
+        _status_block(t("gtfs.status.aws_runtime"), aws_backend)
 
-        st.markdown("**AWS API preflight**")
         aws_api = status.get("aws_api_checks")
-        if isinstance(aws_api, dict) and aws_api:
-            if aws_api.get("ok"):
-                st.success("AWS STATUS_AWESOME: all AWS API checks passed.")
-            else:
-                st.warning("Run ALL AWS APIs is false. Review `failed_checks` and `checks`.")
-            st.json(_short_json(aws_api))
-        else:
-            st.info("Run `ALL AWS APIs` to verify frontend-facing AWS endpoints.")
+        _api_preflight_block(t("gtfs.status.aws_api"), aws_api, hint_key="gtfs.status.aws_api_hint")
 
     _render_connectivity_tags(
         local_db=local_db,
@@ -649,12 +810,12 @@ def render_gtfs_ops_widget() -> None:
         aws_db=aws_db,
     )
 
-    st.markdown("#### Logs")
+    st.markdown(t("ui.misc.gtfs_ops.logs"))
     l1, l2 = st.columns(2)
     with l1:
         ss["ops.logs.local.panel"] = "\n".join(ss.get("ops.logs.local") or [])
         st.text_area(
-            "Local logs",
+            t("ui.misc.gtfs_ops.local_logs"),
             height=240,
             key="ops.logs.local.panel",
             disabled=True,
@@ -662,7 +823,7 @@ def render_gtfs_ops_widget() -> None:
     with l2:
         ss["ops.logs.aws.panel"] = "\n".join(ss.get("ops.logs.aws") or [])
         st.text_area(
-            "AWS logs",
+            t("ui.misc.gtfs_ops.aws_logs"),
             height=240,
             key="ops.logs.aws.panel",
             disabled=True,
@@ -670,27 +831,28 @@ def render_gtfs_ops_widget() -> None:
 
 
 def _validate_action(path: Path, log: LogFn, progress: ProgressFn) -> dict[str, Any]:
-    progress(0.2, "Running GTFS zip validation")
+    progress(0.2, t("ops.progress.validating"))
     log(f"Validating GTFS zip: {path}")
     report = validate_gtfs_zip(path)
 
     if report.get("ok"):
-        progress(1.0, "Validation succeeded")
+        progress(1.0, t("ops.progress.validation_ok"))
         st.session_state[_work_state_key("ops.gtfs.last_file_path")] = str(path)
         st.session_state[_work_state_key("ops.gtfs.last_checksum")] = str(report.get("checksum_sha256") or "")
         log(f"Validation OK. checksum={report.get('checksum_sha256')}")
     else:
-        progress(1.0, "Validation failed")
+        progress(1.0, t("ops.progress.validation_failed"))
         log(f"Validation errors: {report.get('errors')}")
 
     st.session_state[_work_state_key("ops.gtfs.last_validation")] = report
+    _record_structure_result(path, report)
     return report
 
 
 def _local_status_action(cfg: OpsConfig, log: LogFn, progress: ProgressFn) -> dict[str, Any]:
-    progress(0.2, "Collecting local DB status")
+    progress(0.2, t("ops.progress.local_status"))
     out = check_local_status(cfg, log=log)
-    progress(1.0, "Local status collected")
+    progress(1.0, t("ops.progress.local_status_done"))
     log("Local status check completed")
     payload = dict(out)
     local_db = payload.get("local_db") if isinstance(payload.get("local_db"), dict) else {}
@@ -703,9 +865,9 @@ def _local_status_action(cfg: OpsConfig, log: LogFn, progress: ProgressFn) -> di
 
 
 def _aws_status_action(cfg: OpsConfig, log: LogFn, progress: ProgressFn) -> dict[str, Any]:
-    progress(0.2, "Collecting AWS status")
+    progress(0.2, t("ops.progress.aws_status"))
     out = check_aws_status(cfg, log=log)
-    progress(1.0, "AWS status collected")
+    progress(1.0, t("ops.progress.aws_status_done"))
     log("AWS status check completed")
     ssh_ok = bool((out.get("ssh") or {}).get("ok"))
     aws_otp = out.get("aws_otp") if isinstance(out.get("aws_otp"), dict) else {}
@@ -734,10 +896,18 @@ def _aws_full_deploy_action(
         "errors": [],
     }
 
-    progress(0.02, "Step 1/2: deploying gtfs_app runtime (backend + OTP)")
+    blocked = gtfs_quarantine.refusal(gtfs_zip)
+    if blocked:
+        log(blocked)
+        out["errors"].append(blocked)
+        out["steps"]["quarantine"] = {"ok": False, "reason": blocked}
+        out["finished_at"] = _now_iso()
+        return out
+
+    progress(0.02, t("ops.progress.deploy_step1"))
 
     def _runtime_progress(frac: float, msg: str) -> None:
-        progress(0.02 + (max(0.0, min(1.0, frac)) * 0.48), f"Step 1/2 runtime deploy: {msg}")
+        progress(0.02 + (max(0.0, min(1.0, frac)) * 0.48), t("ops.progress.deploy_step1_detail", msg=msg))
 
     runtime_source = cfg.transportapp_root or cfg.backend_push_local_dir
     runtime_res = run_aws_backend_push(
@@ -753,7 +923,7 @@ def _aws_full_deploy_action(
         out["finished_at"] = _now_iso()
         return out
 
-    progress(0.52, "Step 2/2: applying GTFS + DB + OTP graph on AWS")
+    progress(0.52, t("ops.progress.deploy_step2"))
 
     def _publish_progress(frac: float, msg: str) -> None:
         progress(0.52 + (max(0.0, min(1.0, frac)) * 0.48), f"Step 2/2 GTFS/DB/OTP: {msg}")
@@ -770,28 +940,28 @@ def _aws_full_deploy_action(
     out["aws_db"] = publish_res.get("steps", {}).get("status", {}).get("aws_db")
     out["ok"] = True
     out["finished_at"] = _now_iso()
-    progress(1.0, "AWS full deploy completed")
+    progress(1.0, t("ops.progress.deploy_done"))
     log("AWS full deploy completed (runtime + GTFS/DB/OTP).")
     return out
 
 
 def _local_api_checks_action(cfg: OpsConfig, log: LogFn, progress: ProgressFn) -> dict[str, Any]:
-    progress(0.15, "Running ALL local server API checks")
+    progress(0.15, t("ops.progress.local_apis"))
     out = run_all_local_server_api_checks(cfg, log=log)
     if out.get("ok"):
-        progress(1.0, "Run ALL APIs passed (STATUS_AWESOME)")
+        progress(1.0, t("ops.progress.local_apis_ok"))
     else:
-        progress(1.0, "Run ALL APIs completed: false")
+        progress(1.0, t("ops.progress.local_apis_failed"))
     log(f"Run ALL APIs completed: {out.get('status')}")
     return out
 
 
 def _aws_api_checks_action(cfg: OpsConfig, log: LogFn, progress: ProgressFn) -> dict[str, Any]:
-    progress(0.15, "Running ALL AWS server API checks")
+    progress(0.15, t("ops.progress.aws_apis"))
     out = run_all_aws_server_api_checks(cfg, log=log)
     if out.get("ok"):
-        progress(1.0, "Run ALL AWS APIs passed (STATUS_AWESOME)")
+        progress(1.0, t("ops.progress.aws_apis_ok"))
     else:
-        progress(1.0, "Run ALL AWS APIs completed: false")
+        progress(1.0, t("ops.progress.aws_apis_failed"))
     log(f"Run ALL AWS APIs completed: {out.get('status')}")
     return out

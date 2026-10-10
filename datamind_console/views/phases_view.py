@@ -7,6 +7,10 @@ from typing import Any, Callable
 
 import streamlit as st
 
+from datamind_console.i18n import t
+from datamind_console.ui.components.page import page_header
+from datamind_console.ui.components.states import error_state
+from datamind_console.ui.formatting import format_date
 from datamind_console.views.phases.phase1_view import render_phase1_view
 from datamind_console.views.phases.phase2_view import render_phase2_view
 from datamind_console.views.phases.phase3_view import render_phase3_view
@@ -46,13 +50,11 @@ def _safe_call(view_fn: Callable[..., Any], *, ctx: Any, **deps: Any) -> None:
             view_fn(ctx=ctx)
             return
 
-        st.error(f"{view_fn.__name__} failed (TypeError).")
-        st.exception(e)
+        error_state(e, context_key="error.page.phase_render", phase=getattr(ctx, "current_phase", ""))
         return
 
-    except Exception as e:
-        st.error(f"{view_fn.__name__} crashed while rendering.")
-        st.exception(e)
+    except Exception as e:  # noqa: BLE001 - rendered and logged
+        error_state(e, context_key="error.page.phase_render", phase=getattr(ctx, "current_phase", ""))
         return
 
 
@@ -68,58 +70,92 @@ class PhaseContext:
 # -------------------------
 # State (only phase selector)
 # -------------------------
+PHASES = (1, 2, 3, 4, 5)
+
+
 def _init_phase_state() -> None:
+    """Phase comes from ``?phase=`` (deep link) first, then the session."""
     ss = st.session_state
     ss.setdefault("phases.current_phase", 1)
+    requested = st.query_params.get("phase")
+    if requested and str(requested).isdigit() and int(requested) in PHASES:
+        ss["phases.current_phase"] = int(requested)
 
 
 def _phase_selector() -> int:
     ss = st.session_state
-    c1, c2, c3, c4, c5 = st.columns(5)
+    current = int(ss.get("phases.current_phase") or 1)
+    picked = st.segmented_control(
+        t("phases.selector"),
+        options=list(PHASES),
+        default=current,
+        format_func=lambda p: t(f"phase.{p}.label"),
+        key="phases.selector",
+        label_visibility="collapsed",
+        width="stretch",
+    )
+    if picked and int(picked) != current:
+        ss["phases.current_phase"] = int(picked)
+        st.query_params["phase"] = str(int(picked))
+        st.query_params.pop("tab", None)
+        st.rerun()
+    st.caption(t(f"phase.{current}.description"))
+    return current
 
-    def set_phase(p: int) -> None:
-        ss["phases.current_phase"] = p
 
-    with c1:
-        st.button("Phase 1 · Nodes", use_container_width=True, on_click=set_phase, args=(1,), key="phases.btn.p1")
-    with c2:
-        st.button("Phase 2 · Semantics", use_container_width=True, on_click=set_phase, args=(2,), key="phases.btn.p2")
-    with c3:
-        st.button("Phase 3 · Routes", use_container_width=True, on_click=set_phase, args=(3,), key="phases.btn.p3")
-    with c4:
-        st.button("Phase 4 · Naming", use_container_width=True, on_click=set_phase, args=(4,), key="phases.btn.p4")
-    with c5:
-        st.button("Phase 5 · GTFS", use_container_width=True, on_click=set_phase, args=(5,), key="phases.btn.p5")
+@st.cache_data(ttl=120, show_spinner=False)
+def _automation_history() -> dict[str, Any]:
+    from datamind_console.db.db import query_one
 
-    return int(ss["phases.current_phase"])
+    sessions = query_one(
+        "SELECT count(*) AS n, max(created_at) AS last_at FROM console.orchestrator_sessions"
+    ) or {}
+    autopilot_tables = query_one(
+        "SELECT to_regclass('console.pipeline_autopilot_runs') IS NOT NULL AS present"
+    ) or {}
+    return {
+        "sessions": int(sessions.get("n") or 0),
+        "last_session": sessions.get("last_at"),
+        "autopilot_tables": bool(autopilot_tables.get("present")),
+    }
+
+
+def _automation_panel() -> None:
+    """How automated runs actually happen (terminal), with recorded history.
+
+    The console has no orchestrator screen (it was never wired, commit
+    1fb6a471). This panel replaces the old pointer to a non-existent
+    "Operator Orchestrator" page with facts.
+    """
+    with st.expander(t("phases.automation.title"), icon=":material/terminal:"):
+        st.caption(t("phases.automation.body"))
+        st.code("python -m datamind_console.orchestrator.autopilot_worker", language="bash")
+        try:
+            hist = _automation_history()
+        except Exception as exc:  # noqa: BLE001 - rendered and logged
+            from datamind_console.ui.components.states import error_state
+
+            error_state(exc, context_key="error.page.phases", retry=False)
+            return
+        st.caption(
+            t(
+                "phases.automation.history",
+                n=hist["sessions"],
+                date=format_date(hist["last_session"]),
+            )
+        )
+        if not hist["autopilot_tables"]:
+            st.warning(t("phases.automation.tables_missing"), icon=":material/database:")
+        st.caption(t("phases.automation.docs"))
 
 
 def render_phases_view(*, analytics: Any, audit: Any) -> None:
     _init_phase_state()
     ss = st.session_state
-    workspace_screen = (
-        int(ss.get("phases.current_phase") or 1) == 1
-        and str(ss.get("p1.section") or "Steps") == "Workspace Nodes"
-    )
 
-    if workspace_screen:
-        ss["phases.current_phase"] = 1
-        current_phase = 1
-        st.markdown(
-            """
-            <style>
-              .block-container { padding-top: 0.75rem; }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-    else:
-        st.subheader("Manual Phase Workspaces")
-        st.caption(
-            "Use this screen for manual checkpoints and review tasks. "
-            "For automated Phase 1/2/3 execution, blockers, approvals, and resume loops, run the Operator Orchestrator."
-        )
-        current_phase = _phase_selector()
+    page_header(t("page.phases.title"), t("page.phases.subtitle"), eyebrow=t("page.phases.eyebrow"))
+    current_phase = _phase_selector()
+    _automation_panel()
 
     ctx = PhaseContext(
         user=ss.get("auth.user") or {},

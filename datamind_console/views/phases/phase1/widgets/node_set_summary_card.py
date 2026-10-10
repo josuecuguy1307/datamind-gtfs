@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import streamlit as st
+from datamind_console.i18n import t
 
 try:
     import pydeck as pdk
@@ -66,7 +67,7 @@ def _call_first(obj: Any, names: Sequence[str], *args, **kwargs):
 
 def _summary_from_dict(d: Dict[str, Any]) -> NodeSetSummary:
     node_set_id = str(d.get("node_set_id") or d.get("id") or d.get("nodeSetId") or "")
-    title = str(d.get("name") or d.get("title") or f"Node set {node_set_id}")
+    title = str(d.get("name") or d.get("title") or t("p1.node_set_title", id=node_set_id))
 
     # sample points can come as [{lat,lon}] or [(lat,lon)]
     sp = d.get("sample_points") or d.get("points") or d.get("samplePoints")
@@ -114,7 +115,7 @@ def fetch_node_set_summary(node_set_id: str) -> NodeSetSummary:
 
     return NodeSetSummary(
         node_set_id=str(d.get("node_set_id")),
-        title=f"Node set {str(d.get('node_set_id'))[:8]}",
+        title=t("p1.node_set_title", id=str(d.get('node_set_id'))[:8]),
         context_key=d.get("context_key"),
         created_at=str(d.get("created_at")) if d.get("created_at") else None,
         n_nodes=d.get("n_resolved"),
@@ -139,7 +140,7 @@ def _center_zoom_from_points(points: Sequence[LatLon]) -> Tuple[LatLon, float]:
 
 def render_points_preview(points: Sequence[LatLon], *, height: int, key: str) -> None:
     if pdk is None or not points:
-        st.caption("Map preview unavailable.")
+        st.caption(t("ui.p124.node_set_summary_card.map_preview_unavailable"))
         return
 
     center, zoom = _center_zoom_from_points(points)
@@ -177,8 +178,8 @@ def render_node_set_summary_card(
     key_prefix: str = "p1.summary",   # DEFAULT
     show_map: bool = True,
     map_height: int = 160,
-    primary_label: str = "Use this node set",
-    secondary_label: Optional[str] = "Inspect",
+    primary_label: Optional[str] = None,
+    secondary_label: Optional[str] = "__default__",
 ) -> Optional[Tuple[str, str]]:
 
     """
@@ -197,19 +198,19 @@ def render_node_set_summary_card(
             st.caption(s.node_set_id)
 
             if s.context_key:
-                st.write(f"**context:** `{s.context_key}`")
+                st.write(t("ui.p124.node_set_summary_card.context_context_key", context_key=(s.context_key)))
             if s.created_at:
-                st.write(f"**created:** {s.created_at}")
+                st.write(t("ui.p124.node_set_summary_card.created_created_at", created_at=(s.created_at)))
 
             # Metrics (only show if present)
             if s.n_nodes is not None:
-                st.write(f"**nodes:** {s.n_nodes}")
+                st.write(t("ui.p124.node_set_summary_card.nodes_n_nodes", n_nodes=(s.n_nodes)))
             if s.n_stop_candidates is not None:
-                st.write(f"**STOP cand.:** {s.n_stop_candidates}")
+                st.write(t("ui.p124.node_set_summary_card.stop_cand_n_stop_candidates", n_stop_candidates=(s.n_stop_candidates)))
             if s.n_poi_candidates is not None:
-                st.write(f"**POI cand.:** {s.n_poi_candidates}")
+                st.write(t("ui.p124.node_set_summary_card.poi_cand_n_poi_candidates", n_poi_candidates=(s.n_poi_candidates)))
             if s.n_clusters is not None:
-                st.write(f"**clusters:** {s.n_clusters}")
+                st.write(t("ui.p124.node_set_summary_card.clusters_n_clusters", n_clusters=(s.n_clusters)))
 
         with mid:
             if show_map:
@@ -221,16 +222,16 @@ def render_node_set_summary_card(
                         key=_k(key_prefix, s.node_set_id, "map"),
                     )
                 else:
-                    st.caption("No sample points available for preview.")
+                    st.caption(t("ui.p124.node_set_summary_card.no_sample_points_available_preview"))
 
         with right:
             evt: Optional[Tuple[str, str]] = None
 
-            if st.button(primary_label, key=_k(key_prefix, s.node_set_id, "btn.primary"), use_container_width=True):
+            if st.button(primary_label or t("p1.use_node_set"), key=_k(key_prefix, s.node_set_id, "btn.primary"), use_container_width=True):
                 evt = ("primary", s.node_set_id)
 
             if secondary_label:
-                if st.button(secondary_label, key=_k(key_prefix, s.node_set_id, "btn.secondary"), use_container_width=True):
+                if st.button(t("p1.inspect") if secondary_label == "__default__" else secondary_label, key=_k(key_prefix, s.node_set_id, "btn.secondary"), use_container_width=True):
                     evt = ("secondary", s.node_set_id)
 
             return evt

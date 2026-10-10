@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 
 import streamlit as st
 import pydeck as pdk
+from datamind_console.i18n import t
 
 
 def _path_from_geojson(geojson: Dict[str, Any]) -> List[List[float]]:
@@ -27,12 +28,12 @@ def _cached_route_map_payload(*, _client: Any, route_id: str) -> dict:
 
 def render_phase5_workspace_map(*, client: Any, key: str = "p5_workspace") -> None:
     ss = st.session_state
-    st.markdown("#### Workspace")
+    st.markdown(t("ui.p5.phase5_workspace_map.workspace"))
     c1, c2 = st.columns([1, 1])
     with c1:
-        st.button("Load / Refresh workspace", use_container_width=True, key=f"{key}.refresh")
+        st.button(t("ui.p5.phase5_workspace_map.load_refresh_workspace"), use_container_width=True, key=f"{key}.refresh")
     with c2:
-        if st.button("Clear map cache", use_container_width=True, key=f"{key}.clear_cache"):
+        if st.button(t("ui.p5.phase5_workspace_map.clear_map_cache"), use_container_width=True, key=f"{key}.clear_cache"):
             st.cache_data.clear()
             st.rerun()
 
@@ -40,23 +41,23 @@ def render_phase5_workspace_map(*, client: Any, key: str = "p5_workspace") -> No
     direction_id = int(ss.get("phase5.direction_id") or 0)
     route_id = (ss.get("phase5.route_id") or "").strip()
     if not route_id:
-        st.info("Select service_route_id + direction in Route inputs first.")
+        st.info(t("ui.p5.phase5_workspace_map.select_service_route_id_direction_route"))
         return
     st.caption(
-        f"service_route_id: `{service_route_id or '-'}` | direction_id: `{direction_id}` | route_id: `{route_id}`"
+        t("ui.p5.phase5_workspace_map.service_route_id_service_route_id", service_route_id=(service_route_id or '-'), direction_id=(direction_id), route_id=(route_id))
     )
 
     try:
         payload = _cached_route_map_payload(_client=client, route_id=route_id)
     except Exception as e:
-        st.error(f"Failed to load route geometry: {e}")
+        st.error(t("ui.p5.phase5_workspace_map.failed_load_route_geometry_e", e=(e)))
         return
 
     stops = payload.get("stops") or []
     path = _path_from_geojson(payload.get("route_geojson") or {})
 
     if not stops and not path:
-        st.info("No route geometry/stops available for this route.")
+        st.info(t("ui.p5.phase5_workspace_map.no_route_geometry_stops_available_this"))
         return
 
     center_lat = float(stops[0].get("lat")) if stops else float(path[0][0])
@@ -114,17 +115,17 @@ def render_phase5_workspace_map(*, client: Any, key: str = "p5_workspace") -> No
         key=f"{key}.deck",
     )
 
-    st.caption(f"Route: {payload.get('route_name') or route_id} | Stops: {len(stops)}")
+    st.caption(t("ui.p5.phase5_workspace_map.route_route_name_stops_n_stops", route_name=(payload.get('route_name') or route_id), n_stops=(len(stops))))
 
     meta = payload.get("route_meta") or {}
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Geom verified (P3)", str(meta.get("geom_human_verified")))
-    m2.metric("Semantics verified (P4)", str(meta.get("semantics_human_verified")))
-    m3.metric("Geom confidence", f"{float(meta.get('geom_naming_confidence') or 0.0):.3f}")
-    m4.metric("Name confidence", f"{float(meta.get('semantics_naming_confidence') or 0.0):.3f}")
+    m1.metric(t("ui.p5.phase5_workspace_map.geom_verified_p3"), str(meta.get("geom_human_verified")))
+    m2.metric(t("ui.p5.phase5_workspace_map.semantics_verified_p4"), str(meta.get("semantics_human_verified")))
+    m3.metric(t("ui.p5.phase5_workspace_map.geom_confidence"), f"{float(meta.get('geom_naming_confidence') or 0.0):.3f}")
+    m4.metric(t("ui.p5.phase5_workspace_map.name_confidence"), f"{float(meta.get('semantics_naming_confidence') or 0.0):.3f}")
 
-    with st.expander("Phase 3/4 route details", expanded=False):
+    with st.expander(t("ui.p5.phase5_workspace_map.phase_3_4_route_details"), expanded=False):
         st.json(meta)
 
-    with st.expander("Route stops (final geocoder mapping)", expanded=False):
+    with st.expander(t("ui.p5.phase5_workspace_map.route_stops_final_geocoder_mapping"), expanded=False):
         st.dataframe(stops, use_container_width=True, hide_index=True, height=240)

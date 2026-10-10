@@ -6,3 +6,90 @@ enableXsrfProtection = true
 
 [browser]
 gatherUsageStats = false
+
+[client]
+# Operator console: hide Streamlit's developer menu items (Rerun, Clear cache,
+# Deploy). Developers can run with `--client.toolbarMode developer`.
+toolbarMode = "viewer"
+
+# ---------------------------------------------------------------------------
+# DataMind design tokens. Mirrored in datamind_console/ui/theme.py and kept in
+# sync by datamind_console/tests/test_theme_tokens.py. Do not edit one without
+# the other.
+# ---------------------------------------------------------------------------
+[theme]
+font = "sans-serif"
+headingFont = "sans-serif"
+codeFont = "monospace"
+headingFontWeights = [700, 650, 600, 600, 600, 600]
+baseRadius = "0.5rem"
+buttonRadius = "0.5rem"
+showWidgetBorder = true
+showSidebarBorder = true
+linkUnderline = false
+
+# "Night": deep navy and indigo, cream text, amber emphasis, cyan information.
+[theme.dark]
+base = "dark"
+primaryColor = "#5B67F0"
+backgroundColor = "#0B1120"
+secondaryBackgroundColor = "#151E33"
+textColor = "#EEE7D5"
+linkColor = "#5CCBEE"
+borderColor = "#2A3654"
+dataframeBorderColor = "#2A3654"
+dataframeHeaderBackgroundColor = "#1B2640"
+codeBackgroundColor = "#151E33"
+greenColor = "#3DD68C"
+greenTextColor = "#7FE8B5"
+redColor = "#F2615C"
+redTextColor = "#FF9A95"
+orangeColor = "#F59E3B"
+orangeTextColor = "#FFC27D"
+yellowColor = "#F2B441"
+yellowTextColor = "#F7CF7A"
+blueColor = "#5CCBEE"
+blueTextColor = "#8EDCF4"
+violetColor = "#8B95FF"
+violetTextColor = "#B6BCFF"
+grayColor = "#7E879E"
+grayTextColor = "#C3C9D8"
+chartCategoricalColors = ["#F2B441", "#5CCBEE", "#3DD68C", "#8B95FF", "#F2615C", "#C792EA", "#E8A87C", "#7FD1B9", "#A9B1C6", "#FFD580"]
+
+[theme.dark.sidebar]
+backgroundColor = "#0E1528"
+secondaryBackgroundColor = "#151E33"
+borderColor = "#2A3654"
+
+# "Paper": cream paper surfaces, navy ink, indigo actions.
+[theme.light]
+base = "light"
+primaryColor = "#3F4BC4"
+backgroundColor = "#F7F2E6"
+secondaryBackgroundColor = "#ECE5D4"
+textColor = "#131B33"
+linkColor = "#0C6584"
+borderColor = "#D3C9B2"
+dataframeBorderColor = "#D3C9B2"
+dataframeHeaderBackgroundColor = "#EFE8D7"
+codeBackgroundColor = "#ECE5D4"
+greenColor = "#1C7A4B"
+greenTextColor = "#14633C"
+redColor = "#B0302D"
+redTextColor = "#922420"
+orangeColor = "#C26A08"
+orangeTextColor = "#8A4A04"
+yellowColor = "#C2850F"
+yellowTextColor = "#7A520A"
+blueColor = "#0C6584"
+blueTextColor = "#0A526B"
+violetColor = "#3F4BC4"
+violetTextColor = "#323C9E"
+grayColor = "#6B7389"
+grayTextColor = "#3E465C"
+chartCategoricalColors = ["#C2850F", "#0C6584", "#1C7A4B", "#3F4BC4", "#B0302D", "#7A4FA3", "#A8603A", "#2E8A72", "#4C556E", "#8C6D1F"]
+
+[theme.light.sidebar]
+backgroundColor = "#EFE8D7"
+secondaryBackgroundColor = "#E6DEC9"
+borderColor = "#D3C9B2"

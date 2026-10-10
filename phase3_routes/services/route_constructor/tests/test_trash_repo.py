@@ -4,10 +4,15 @@ Tests for the route trash / papelera system.
 These tests use a real database connection (integration tests).
 Run with: python -m pytest phase3_routes/services/route_constructor/tests/test_trash_repo.py -v
 
-Requires:
-- DB_DSN / DATABASE_URL / SUPABASE_DB_* env vars
-- Migration 030_route_trash.sql applied
-- At least one route_job in the DB (or the test creates one)
+These tests APPLY 030_route_trash.sql, COMMIT it, and exercise trash, purge
+and restore flows. They must never touch the operational database, so they
+ignore DB_DSN / DATABASE_URL / SUPABASE_DB_* entirely and run only when:
+
+- DATAMIND_DISPOSABLE_TEST_DSN names a database, and
+- that database's name contains "test", "scratch" or "disposable", and
+- it is not the database named by any operational DSN variable.
+
+Otherwise every test here is skipped with the reason.
 """
 from __future__ import annotations
 
@@ -25,21 +30,38 @@ from psycopg2.extras import RealDictCursor
 # Helpers -- lightweight DB access without importing full repo stack
 # ---------------------------------------------------------------------------
 
+_OPERATIONAL_DSN_VARS = (
+    "DB_DSN", "DATABASE_URL", "LOCAL_DB_DSN", "DB_DSN_LOCAL", "DATAMIND_LOCAL_DB_DSN",
+    "DATAMIND_CONSOLE_DB_DSN", "LOCAL_GTFS_DB_DSN", "SERVER_DB_DSN", "AWS_DB_DSN", "SUPABASE_DB_URL",
+)
+_DISPOSABLE_MARKERS = ("test", "scratch", "disposable")
+
+
+def _db_name(dsn: str) -> str:
+    try:
+        from psycopg2.extensions import parse_dsn
+
+        return (parse_dsn(dsn).get("dbname") or "").lower()
+    except Exception:
+        return ""
+
+
+def _disposable_dsn() -> tuple[str, str]:
+    """(dsn, "") when a disposable test database is configured, else ("", why not)."""
+    dsn = os.environ.get("DATAMIND_DISPOSABLE_TEST_DSN", "").strip()
+    if not dsn:
+        return "", "DATAMIND_DISPOSABLE_TEST_DSN is not set (these tests apply migrations and purge rows)"
+    name = _db_name(dsn)
+    if not any(marker in name for marker in _DISPOSABLE_MARKERS):
+        return "", f"refusing database {name or '?'!r}: its name must contain one of {_DISPOSABLE_MARKERS}"
+    operational = {_db_name(os.environ[v]) for v in _OPERATIONAL_DSN_VARS if os.environ.get(v)} | {"datamind_ml"}
+    if name in operational:
+        return "", f"refusing database {name!r}: it is an operational database"
+    return dsn, ""
+
+
 def _get_dsn() -> str:
-    dsn = os.environ.get("DB_DSN") or os.environ.get("DATABASE_URL")
-    if dsn:
-        return dsn
-    host = os.environ.get("SUPABASE_DB_HOST")
-    if host:
-        return (
-            f"host={host} "
-            f"port={os.environ.get('SUPABASE_DB_PORT', '5432')} "
-            f"dbname={os.environ.get('SUPABASE_DB_NAME', 'postgres')} "
-            f"user={os.environ.get('SUPABASE_DB_USER', 'postgres')} "
-            f"password={os.environ.get('SUPABASE_DB_PASSWORD', '')} "
-            f"sslmode=require"
-        )
-    return ""
+    return _disposable_dsn()[0]
 
 
 def _apply_sql_file(cur, path: Path) -> None:
@@ -135,7 +157,7 @@ def _cleanup_test_service_route(cur, service_route_id: uuid.UUID):
 # Test class
 # ---------------------------------------------------------------------------
 
-@unittest.skipIf(not _get_dsn(), "No DB connection configured")
+@unittest.skipIf(not _get_dsn(), _disposable_dsn()[1] or "disposable test database configured")
 class TrashRepoIntegrationTests(unittest.TestCase):
     """Integration tests for route_trash operations."""
 
@@ -506,7 +528,7 @@ class TrashRepoIntegrationTests(unittest.TestCase):
         self.assertIn("restore", action_types)
 
 
-@unittest.skipIf(not _get_dsn(), "No DB connection configured")
+@unittest.skipIf(not _get_dsn(), _disposable_dsn()[1] or "disposable test database configured")
 class DeleteServiceRouteIntegrationTests(unittest.TestCase):
     """
     Integration tests for the delete_service_route() trash workflow.
@@ -862,3 +884,33 @@ class DeleteServiceRouteIntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# Guard: these integration tests may only ever run on a disposable database.
+# ---------------------------------------------------------------------------
+
+def test_disposable_guard_ignores_operational_env(monkeypatch):
+    monkeypatch.delenv("DATAMIND_DISPOSABLE_TEST_DSN", raising=False)
+    monkeypatch.setenv("DB_DSN", "postgresql://u@127.0.0.1:5432/datamind_ml")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u@127.0.0.1:5432/datamind_ml")
+    assert _get_dsn() == ""
+
+
+def test_disposable_guard_refuses_live_and_unmarked_names(monkeypatch):
+    monkeypatch.setenv("DB_DSN", "postgresql://u@127.0.0.1:5432/transit_ops")
+    for dsn in ("postgresql://u@127.0.0.1:5432/datamind_ml",
+                "postgresql://u@127.0.0.1:5432/transit_ops",
+                "dbname=route_copy user=u"):
+        monkeypatch.setenv("DATAMIND_DISPOSABLE_TEST_DSN", dsn)
+        assert _get_dsn() == "", dsn
+    monkeypatch.setenv("DB_DSN", "postgresql://u@127.0.0.1:5432/datamind_test")
+    monkeypatch.setenv("DATAMIND_DISPOSABLE_TEST_DSN", "postgresql://u@127.0.0.1:5432/datamind_test")
+    assert _get_dsn() == ""  # same database as an operational DSN
+
+
+def test_disposable_guard_accepts_a_marked_scratch_database(monkeypatch):
+    for var in ("DB_DSN", "DATABASE_URL", "LOCAL_DB_DSN"):
+        monkeypatch.setenv(var, "postgresql://u@127.0.0.1:5432/datamind_ml")
+    monkeypatch.setenv("DATAMIND_DISPOSABLE_TEST_DSN", "postgresql://u@127.0.0.1:5432/datamind_trash_test")
+    assert _get_dsn().endswith("/datamind_trash_test")

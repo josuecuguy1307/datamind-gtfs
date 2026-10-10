@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Iterable, List, Optional, Sequence
 
 import streamlit as st
+from datamind_console.i18n import t as _t
 
 
 GTFS_PREVIEW_TABLES: List[str] = [
@@ -65,7 +66,7 @@ def render_gtfs_step_output_preview(
     key: str,
     route_id: Optional[str] = None,
     route_ids: Optional[Iterable[str]] = None,
-    title: str = "GTFS rows preview for this step",
+    title: Optional[str] = None,
     default_tables: Optional[Sequence[str]] = None,
     expanded: bool = False,
     note: Optional[str] = None,
@@ -82,18 +83,18 @@ def render_gtfs_step_output_preview(
     state_key_rows = f"{key}.rows_by_table"
     state_key_meta = f"{key}.meta"
 
-    with st.expander(title, expanded=expanded):
+    with st.expander(title or _t("p5.preview.default_title"), expanded=expanded):
         c1, c2 = st.columns([2, 1])
         with c1:
             tables = st.multiselect(
-                "GTFS tables to preview",
+                _t("ui.p5._gtfs_step_preview.gtfs_tables_preview"),
                 GTFS_PREVIEW_TABLES,
                 default=defaults,
                 key=f"{key}.tables",
             )
         with c2:
             limit = st.number_input(
-                "Rows per table",
+                _t("ui.p5._gtfs_step_preview.rows_per_table"),
                 min_value=20,
                 max_value=5000,
                 value=200,
@@ -103,18 +104,18 @@ def render_gtfs_step_output_preview(
 
         if route_scope:
             st.caption(
-                "Route-scoped preview: " + ", ".join([f"`{r[:8]}`" for r in route_scope])
+                _t("p5.preview.route_scoped", routes=", ".join([f"`{r[:8]}`" for r in route_scope]))
             )
         else:
-            st.caption("Export-wide preview (no route filter).")
+            st.caption(_t("ui.p5._gtfs_step_preview.export_wide_preview_no_route_filter"))
         if note:
             st.caption(note)
 
         l1, l2 = st.columns([1, 1])
         with l1:
-            do_load = st.button("Load step GTFS preview", use_container_width=True, key=f"{key}.load")
+            do_load = st.button(_t("ui.p5._gtfs_step_preview.load_step_gtfs_preview"), use_container_width=True, key=f"{key}.load")
         with l2:
-            if st.button("Clear preview cache", use_container_width=True, key=f"{key}.clear"):
+            if st.button(_t("ui.p5._gtfs_step_preview.clear_preview_cache"), use_container_width=True, key=f"{key}.clear"):
                 st.session_state.pop(state_key_rows, None)
                 st.session_state.pop(state_key_meta, None)
                 st.rerun()
@@ -124,7 +125,7 @@ def render_gtfs_step_output_preview(
         if do_load:
             should_reload = True
         elif state_key_rows not in st.session_state:
-            st.info("Click `Load step GTFS preview` to visualize inserted columns/rows.")
+            st.info(_t("ui.p5._gtfs_step_preview.click_load_step_gtfs_preview_visualize"))
         else:
             # If user changed table selection/limit, require explicit reload for predictable performance.
             pass
@@ -161,12 +162,11 @@ def render_gtfs_step_output_preview(
         meta_tables = current_meta.get("tables") or list(rows_by_table.keys())
         errors = dict(current_meta.get("errors") or {})
         st.caption(
-            f"Loaded preview for selected gtfs_id internal build context | limit/table={int(current_meta.get('limit') or limit)}"
+            _t("ui.p5._gtfs_step_preview.loaded_preview_selected_gtfs_id_internal", limit=(int(current_meta.get('limit') or limit)))
         )
         if errors:
             st.warning(
-                "Some tables failed to load: "
-                + "; ".join([f"{k}: {v}" for k, v in errors.items()])
+                _t("p5.preview.tables_failed", errors="; ".join([f"{k}: {v}" for k, v in errors.items()]))
             )
 
         for t in meta_tables:
@@ -178,7 +178,7 @@ def render_gtfs_step_output_preview(
                     for r in rows
                 ]
                 cols = list(cleaned_rows[0].keys()) if cleaned_rows else []
-                st.caption(f"rows loaded: {len(rows)} | columns: {', '.join(cols)}")
+                st.caption(_t("ui.p5._gtfs_step_preview.rows_loaded_n_rows_columns_join", n_rows=(len(rows)), join=(', '.join(cols))))
                 st.dataframe(cleaned_rows, use_container_width=True, hide_index=True, height=220)
             else:
-                st.info(f"No rows found in `{t}` for current preview scope.")
+                st.info(_t("ui.p5._gtfs_step_preview.no_rows_found_t_value_current", t_value=(t)))

@@ -195,23 +195,35 @@ def test_corridor_validator_warns_without_zeroing_score_for_borderline_switches(
 
 
 def test_repeated_segment_validator_treats_moderate_overlap_as_warning() -> None:
+    # Backtracks 2 of 13 segment-units (ratio ~0.154): inside the warn band
+    # (0.09, 0.216] for MAX_REPEAT_SEGMENT_RATIO=0.12. The previous fixture
+    # repeated 1 of 15 (0.067), which the validator correctly passes.
     geometry = [
         (0.0, 0.0),
         (0.001, 0.0),
         (0.002, 0.0),
         (0.003, 0.0),
         (0.002, 0.0),
+        (0.001, 0.0),
         (0.004, 0.0),
         (0.005, 0.0),
         (0.006, 0.0),
         (0.007, 0.0),
-        (0.001, 0.0),
+        (0.008, 0.0),
     ]
 
     result = validate_repeated_segments(geometry, route_type="lineal")
 
     assert result.status == "warn"
+    assert 0.09 < result.metrics["repeat_ratio"] <= 0.216
     assert 0.0 < result.score < 0.8
+
+
+def test_repeated_segment_validator_passes_a_single_short_backtrack() -> None:
+    geometry = [(0.0, 0.0), (0.001, 0.0), (0.002, 0.0), (0.003, 0.0), (0.002, 0.0),
+                (0.004, 0.0), (0.005, 0.0), (0.006, 0.0), (0.007, 0.0), (0.001, 0.0)]
+    result = validate_repeated_segments(geometry, route_type="lineal")
+    assert result.status == "pass"
 
 
 def test_canonical_topology_normalizes_internal_linear_to_linear() -> None:

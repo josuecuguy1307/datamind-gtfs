@@ -1,14 +1,25 @@
+"""Phase 4 · Matching: propose routes for one evidence record, then a person labels them.
+
+*Generate candidates* stores a deterministic, explained proposal; it never
+accepts anything. Each label is a human decision with its audit row. There is
+no trained ranking model, so model prediction is not offered.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import streamlit as st
 
-# ✅ ABSOLUTE IMPORT — in-process client
-from datamind_console.phases.phase4_naming.client import _get_phase4_client
+from datamind_console.i18n import status_label, t
+from datamind_console.phases.phase4_naming import evidence_matching as em
+from datamind_console.review.human_review import ReviewInputError, recent_decisions
+from datamind_console.ui.components.review import current_reviewer, decision_log, flash
+from datamind_console.ui.components.states import error_state
+from datamind_console.views.phases.phase4.tabs.evidence_tab import error_text, schema_ready
 
-Json = Dict[str, Any]
+FLASH_KEY = "p4match.flash"
+RELEVANCE_OPTIONS = (2, 1, 0)
 
 
 @dataclass
@@ -16,150 +27,98 @@ class Phase4Context:
     user: Optional[dict] = None
 
 
-def _ss():
-    return st.session_state
-
-
-def _ensure_state():
-    ss = _ss()
-    ss.setdefault("phase4.route_id", "")
-    ss.setdefault("phase4.record_id", "")
-    ss.setdefault("phase4.candidates", None)
-    ss.setdefault("phase4.match_confidence", None)
-
-
-# ✅ SINGLE SOURCE OF TRUTH
-def _client():
-    return _get_phase4_client()
-
-
-def _score_to_confidence(items: list[dict]) -> float:
-    if not items:
-        return 0.0
-    s1 = float(items[0].get("score", 0.0) or 0.0)
-    s2 = float(items[1].get("score", 0.0) or 0.0) if len(items) > 1 else 0.0
-    gap = max(0.0, s1 - s2)
-    return max(0.0, min(1.0, 0.55 + 0.45 * (gap / (abs(s1) + 1e-6))))
-
-
 def render_matching_tab(ctx: Phase4Context) -> None:
-    _ensure_state()
-    ss = _ss()
-    cli = _client()
-
-    st.subheader("Phase 4 — Matching")
-
-    route_id = (ss.get("phase4.route_id") or "").strip()
-    record_id = (ss.get("phase4.record_id") or "").strip()
-
-    if not route_id:
-        st.warning("Select a route in **Queue** first.")
+    st.subheader(t("p4match.title"), anchor=False)
+    st.caption(t("p4match.intro"))
+    if not schema_ready():
         return
+    flash(FLASH_KEY)
+    st.info(t("p4match.no_model"), icon=":material/model_training:")
+
+    record_id = (st.session_state.get("phase4.record_id") or "").strip()
     if not record_id:
-        st.warning("Select an evidence record in **Evidence** first.")
+        st.warning(t("p4match.pick_evidence"))
         return
+    rec = em.evidence_detail(record_id)
+    if not rec:
+        st.warning(t("p4match.pick_evidence"))
+        return
+    _record_summary(rec)
+    reviewer = current_reviewer()
+    if not reviewer.name.strip():
+        st.caption(t("p4match.reviewer_hint"))
+    active_route = (st.session_state.get("phase4.route_id") or "").strip()
 
-    st.success(f"Active route_id: {route_id}")
-    st.info(f"Evidence record_id: {record_id}")
-
-    colA, colB, colC = st.columns([1, 1, 2])
-    with colA:
-        limit = st.number_input("Top-K", min_value=5, max_value=100, value=25, step=5)
-    with colB:
-        mode = st.selectbox(
-            "Mode",
-            ["heuristic_candidates", "model_predict_and_log"],
-            index=1,
-        )
-    with colC:
-        st.caption("Ranks candidate routes for the selected evidence record.")
-
-    st.divider()
-
-    if st.button("Run matching", use_container_width=True):
-        try:
-            if mode == "heuristic_candidates":
-                out = cli.match_candidates(
-                    record_id=record_id,
-                    limit=int(limit),
-                )
+    c1, c2 = st.columns([1, 3], vertical_alignment="bottom")
+    with c1:
+        limit = st.number_input(t("p4match.limit"), min_value=5, max_value=100, value=25, step=5, key="p4match.limit")
+    with c2:
+        if st.button(t("p4match.generate"), type="primary", key="p4match.generate"):
+            try:
+                out = em.generate_candidates(record_id, reviewer=reviewer, limit=int(limit))
+            except ReviewInputError as exc:
+                st.error(error_text(str(exc)))
+            except Exception as exc:  # noqa: BLE001 - rendered and logged
+                error_state(exc, context_key="p4ev.error.write_failed", retry=False)
             else:
-                out = cli.match_predict_and_log(
-                    record_id=record_id,
-                    model_name="lgbm_lambdarank",
-                    model_version="v1",
-                    limit=int(limit),
-                )
+                flash(FLASH_KEY, t("p4match.generated", n=len(out["items"]), scored=out["routes_scored"]))
+                st.rerun()
+    st.caption(t("p4match.how"))
 
-            ss["phase4.candidates"] = out
-            items = out.get("items") if isinstance(out, dict) else []
-            ss["phase4.match_confidence"] = (
-                _score_to_confidence(items) if isinstance(items, list) else None
-            )
+    candidates = em.list_candidates(record_id)
+    if not candidates:
+        st.info(t("p4match.no_candidates"), icon=":material/search_off:")
+    for cand in candidates:
+        _candidate(cand, record_id=record_id, reviewer=reviewer, active_route=active_route)
 
-            st.toast("Matching complete", icon="✅")
-        except Exception as e:
-            st.error(f"Matching failed: {e}")
+    st.markdown(f"#### {t('p4match.log.title')}")
+    decision_log(recent_decisions("evidence_match"), empty_key="p4match.log.empty")
 
-    st.divider()
 
-    out = ss.get("phase4.candidates")
-    if not out:
-        st.info("Run matching to see candidates.")
-        return
+def _record_summary(rec: dict[str, Any]) -> None:
+    bits = [x for x in (rec.get("route_ref"), rec.get("route_name"), rec.get("operator_name")) if x]
+    ends = " → ".join(x for x in (rec.get("from_name"), rec.get("to_name")) if x)
+    if ends:
+        bits.append(ends)
+    st.success(t("p4match.record", what=" · ".join(bits) or t("p4match.record_empty"), record=rec["record_id"][:8]),
+               icon=":material/description:")
 
-    items = out.get("items")
-    if not items:
-        st.warning("No candidates returned.")
-        return
 
-    conf = ss.get("phase4.match_confidence")
-    if conf is not None:
-        st.metric("Match confidence (heuristic)", f"{conf:.2f}")
-
-    st.markdown("### Ranked candidates")
-
-    for i, cand in enumerate(items[: int(limit)]):
-        cid = str(cand.get("route_id", ""))
-        score = cand.get("score")
-        title = cand.get("route_name") or cand.get("name") or cid
-
-        with st.container(border=True):
-            cols = st.columns([4, 1, 1, 1])
-
-            with cols[0]:
-                st.markdown(f"**#{i+1} {title}**")
-                st.caption(f"route_id: {cid} • score: {score}")
-                if cand.get("features"):
-                    with st.expander("features"):
-                        st.json(cand["features"])
-
-            with cols[1]:
-                if cid == route_id:
-                    st.write("✅")
-
-            with cols[2]:
-                rel = st.selectbox(
-                    "Label",
-                    options=[0, 1, 2],
-                    index=2 if cid == route_id else 0,
-                    key=f"p4_label_{record_id}_{cid}",
-                )
-
-            with cols[3]:
-                if st.button(
-                    "Save",
-                    key=f"p4_save_label_{record_id}_{cid}",
-                    use_container_width=True,
-                ):
-                    try:
-                        cli.match_label(
-                            record_id=record_id,
-                            route_id=cid,
-                            relevance=int(rel),
-                            notes=None,
-                            label_source="admin_ui",
-                        )
-                        st.toast("Label saved", icon="✅")
-                    except Exception as e:
-                        st.error(f"Label save failed: {e}")
+def _candidate(cand: dict[str, Any], *, record_id: str, reviewer, active_route: str) -> None:
+    route_id = cand["route_id"]
+    parts = (cand.get("score_parts") or {}).get("signals") or {}
+    with st.container(border=True):
+        head, score = st.columns([4, 1])
+        with head:
+            mark = " ⭐" if cand.get("is_best") else ""
+            here = f" · {t('p4match.active_route')}" if route_id == active_route else ""
+            st.markdown(f"**{cand.get('route_name') or route_id[:8]}**{mark}{here}")
+            st.caption(" · ".join(f"{t(f'p4match.signal.{k}')} {v:.2f}" for k, v in parts.items()) or t("p4match.no_signals"))
+            if cand.get("relevance") is not None:
+                st.caption(t("p4match.labelled", relevance=status_label("match_relevance", cand["relevance"]),
+                             who=cand.get("reviewed_by") or "—"))
+        score.metric(t("p4match.score"), f"{float(cand['score']):.2f}")
+        current = cand.get("relevance")
+        relevance = st.segmented_control(
+            t("p4match.label"), RELEVANCE_OPTIONS, key=f"p4match.rel.{record_id}.{route_id}",
+            default=current if current in RELEVANCE_OPTIONS else None,
+            format_func=lambda v: status_label("match_relevance", v),
+        )
+        n1, n2 = st.columns([3, 1], vertical_alignment="bottom")
+        with n1:
+            notes = st.text_input(t("p4match.notes"), key=f"p4match.notes.{record_id}.{route_id}",
+                                  value=cand.get("label_notes") or "")
+        with n2:
+            save = st.button(t("p4match.save"), key=f"p4match.save.{record_id}.{route_id}", disabled=relevance is None,
+                             width="stretch")
+        if save and relevance is not None:
+            try:
+                em.label_match(record_id, route_id, int(relevance), reviewer=reviewer, notes=notes,
+                               match_id=cand.get("match_id"))
+            except ReviewInputError as exc:
+                st.error(error_text(str(exc)))
+            except Exception as exc:  # noqa: BLE001 - rendered and logged
+                error_state(exc, context_key="p4ev.error.write_failed", retry=False)
+            else:
+                flash(FLASH_KEY, t("p4match.saved"))
+                st.rerun()

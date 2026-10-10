@@ -1,13 +1,6 @@
 # views/phases/phase2/tabs/__init__.py
+"""Phase 2 panels, loaded by module path from views/phases/phase2_view.py.
 
-from __future__ import annotations
-
-from .extract_tab import render_extract_tab
-from .candidates_tab import render_candidates_tab
-from .approve_tab import render_approve_tab
-
-__all__ = [
-    "render_extract_tab",
-    "render_candidates_tab",
-    "render_approve_tab",
-]
+The extract / candidates / approve tabs this package used to re-export were
+deleted in e0fd494a; importing them made every module in the package fail.
+"""

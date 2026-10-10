@@ -6,8 +6,8 @@ inspection with polyline + stops + semantic details.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
-import os
 from typing import Any, Optional
 
 import pandas as pd
@@ -15,6 +15,9 @@ import psycopg2
 import psycopg2.extras
 import pydeck as pdk
 import streamlit as st
+
+from datamind_console.db.db import active_dsn, read_only_connection
+from datamind_console.i18n import status_label, t
 
 
 _STATUS_COLORS = {
@@ -26,14 +29,15 @@ _STATUS_COLORS = {
 
 
 def _dsn() -> str:
-    value = os.environ.get("DB_DSN") or os.environ.get("LOCAL_DB_DSN")
-    if not value:
-        raise RuntimeError("DB_DSN or LOCAL_DB_DSN must be configured before loading shipment data.")
-    return value
+    """Canonical active DSN (honours local-only mode); never displayed."""
+    return active_dsn()
 
 
+@contextmanager
 def _connect():
-    return psycopg2.connect(_dsn())
+    """Short-lived READ ONLY connection, always closed (canonical helper)."""
+    with read_only_connection(statement_timeout_ms=30_000) as conn:
+        yield conn
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -159,12 +163,12 @@ def _render_overview_metrics(df: pd.DataFrame) -> None:
     total = len(df)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Shipped", shipped)
+    c1.metric(t("ui.p3.greek_ship_overview.shipped"), shipped)
     c2.metric("v2_ready", ready)
-    c3.metric("Failed", failed)
-    c4.metric("Total", total)
+    c3.metric(t("ui.p3.greek_ship_overview.failed"), failed)
+    c4.metric(t("ui.p3.greek_ship_overview.total"), total)
 
-    st.markdown("##### Semantics Coverage (all routes)")
+    st.markdown(t("ui.p3.greek_ship_overview.semantics_coverage_all_routes"))
     sem_cols = st.columns(5)
     has_prod_sem = df["naming_confidence"].notna().sum()
     sem_cols[0].metric("route_prod.semantics", f"{int(has_prod_sem)}/{total}")
@@ -173,7 +177,7 @@ def _render_overview_metrics(df: pd.DataFrame) -> None:
     sem_cols[3].metric("service_days", f"{int(df['has_service_days'].sum())}/{total}")
     sem_cols[4].metric("layover_policy", f"{int(df['has_layover'].sum())}/{total}")
 
-    st.markdown("##### Naming Confidence (shipped only)")
+    st.markdown(t("ui.p3.greek_ship_overview.naming_confidence_shipped_only"))
     shipped_df = df[df["greek_status"] == "swapped"]
     if not shipped_df.empty:
         bins = pd.cut(
@@ -190,14 +194,14 @@ def _render_overview_metrics(df: pd.DataFrame) -> None:
 def _render_multi_route_map(df: pd.DataFrame) -> None:
     shipped_ids = df[df["greek_status"] == "swapped"]["route_id"].tolist()
     if not shipped_ids:
-        st.info("No shipped routes to display.")
+        st.info(t("ui.p3.greek_ship_overview.no_shipped_routes_display"))
         return
 
-    with st.spinner(f"Loading {len(shipped_ids)} polylines..."):
+    with st.spinner(t("ui.p3.greek_ship_overview.loading_n_shipped_ids_polylines", n_shipped_ids=(len(shipped_ids)))):
         poly_df = _load_all_polylines(shipped_ids[:200])
 
     if poly_df.empty:
-        st.warning("No polylines found.")
+        st.warning(t("ui.p3.greek_ship_overview.no_polylines_found"))
         return
 
     layer = pdk.Layer(
@@ -232,16 +236,17 @@ def _render_multi_route_map(df: pd.DataFrame) -> None:
 
 
 def _render_route_inspector(df: pd.DataFrame) -> None:
-    st.markdown("#### Route Inspector")
+    st.markdown(t("ui.p3.greek_ship_overview.route_inspector"))
 
     status_filter = st.selectbox(
-        "Filter by status",
+        t("ui.p3.greek_ship_overview.filter_by_status"),
         options=["swapped", "v2_ready", "failed", "(all)"],
+        format_func=lambda v: t("common.all") if v == "(all)" else status_label("reentry", v),
         key="gso.status_filter",
     )
     view = df if status_filter == "(all)" else df[df["greek_status"] == status_filter]
 
-    q = st.text_input("Search route name / ID", key="gso.search").strip().lower()
+    q = st.text_input(t("ui.p3.greek_ship_overview.search_route_name_id"), key="gso.search").strip().lower()
     if q:
         mask = (
             view["route_name"].fillna("").str.lower().str.contains(q, regex=False)
@@ -250,7 +255,7 @@ def _render_route_inspector(df: pd.DataFrame) -> None:
         view = view[mask]
 
     if view.empty:
-        st.info("No routes match filters.")
+        st.info(t("ui.p3.greek_ship_overview.no_routes_match_filters"))
         return
 
     show_cols = [
@@ -267,7 +272,7 @@ def _render_route_inspector(df: pd.DataFrame) -> None:
         for _, row in view.iterrows()
     ]
     idx = st.selectbox(
-        "Select route to inspect",
+        t("ui.p3.greek_ship_overview.select_route_inspect"),
         options=range(len(options)),
         format_func=lambda i: options[i],
         key="gso.pick",
@@ -331,59 +336,48 @@ def _render_route_inspector(df: pd.DataFrame) -> None:
 
     with cols[1]:
         st.markdown(f"**{selected['route_name'] or '(unnamed)'}**")
-        st.caption(f"`{selected['route_id']}` dir `{int(selected['direction_id'])}`")
+        st.caption(t("ui.p3.greek_ship_overview.route_id_dir_direction_id", route_id=(selected['route_id']), direction_id=(int(selected['direction_id']))))
 
         status_emoji = {"swapped": "OK", "v2_ready": "READY", "failed": "FAIL"}.get(
             selected["greek_status"], "?"
         )
         st.markdown(
-            f"- **GREEK status:** `{selected['greek_status']}` ({status_emoji})\n"
-            f"- **Classification:** `{selected.get('classification') or '-'}`\n"
-            f"- **Operator:** {selected.get('operator') or '-'}\n"
-            f"- **Naming confidence:** {selected.get('naming_confidence') or '-'}\n"
-            f"- **Human verified:** {selected.get('human_verified') or False}\n"
-            f"- **Stops:** {int(selected.get('n_stops') or 0)}\n"
-            f"- **Length:** {int(selected.get('length_m') or 0)} m\n"
-            f"- **Province:** {selected.get('province') or '-'}\n"
+            t("ui.p3.greek_ship_overview.greek_status_greek_status_status_emoji", greek_status=(selected['greek_status']), status_emoji=(status_emoji), classification=(selected.get('classification') or '-'), operator=(selected.get('operator') or '-'), naming_confidence=(selected.get('naming_confidence') or '-'), human_verified=(selected.get('human_verified') or False), n_stops=(int(selected.get('n_stops') or 0)), length_m=(int(selected.get('length_m') or 0)), province=(selected.get('province') or '-'))
         )
 
-        st.markdown("**Catalog coverage:**")
+        st.markdown(t("ui.p3.greek_ship_overview.catalog_coverage"))
         sem_ok = "present" if selected.get("has_catalog_sem") else "MISSING"
         sch_ok = "present" if selected.get("has_schedule") else "MISSING"
         sd_ok = "present" if selected.get("has_service_days") else "MISSING"
         lp_ok = "present" if selected.get("has_layover") else "MISSING"
         st.markdown(
-            f"- catalog.route_semantics: **{sem_ok}**\n"
-            f"- schedule_profile: **{sch_ok}**\n"
-            f"- service_days: **{sd_ok}**\n"
-            f"- layover_policy: **{lp_ok}**\n"
+            t("ui.p3.greek_ship_overview.catalog_route_semantics_sem_ok_schedule", sem_ok=(sem_ok), sch_ok=(sch_ok), sd_ok=(sd_ok), lp_ok=(lp_ok))
         )
 
         if selected.get("last_error"):
-            st.error(f"**Last error:** {selected['last_error']}")
+            st.error(t("ui.p3.greek_ship_overview.last_error_last_error", last_error=(selected['last_error'])))
 
         if stops:
-            st.markdown("##### Stops")
+            st.markdown(t("ui.p3.greek_ship_overview.stops"))
             stops_df = pd.DataFrame(stops)[["seq", "stop_name", "stop_id"]]
             st.dataframe(stops_df, use_container_width=True, hide_index=True, height=280)
 
 
 def render_greek_ship_overview_tab(**_: Any) -> None:
-    st.markdown("### GREEK Ship Overview")
+    st.markdown(t("ui.p3.greek_ship_overview.greek_ship_overview"))
     st.caption(
-        "Full view of all re_entry_queue routes: shipped, ready, and failed. "
-        "Shows semantics coverage, naming confidence, and route inspection."
+        t("ui.p3.greek_ship_overview.full_view_all_re_entry_queue")
     )
 
     df = _load_overview()
     if df.empty:
-        st.info("No routes in re_entry_queue.")
+        st.info(t("ui.p3.greek_ship_overview.no_routes_re_entry_queue"))
         return
 
     _render_overview_metrics(df)
 
     st.markdown("---")
-    st.markdown("#### Shipped Routes Map")
+    st.markdown(t("ui.p3.greek_ship_overview.shipped_routes_map"))
     _render_multi_route_map(df)
 
     st.markdown("---")

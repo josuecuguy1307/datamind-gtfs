@@ -1,29 +1,39 @@
-"""Sample Region Audit Dashboard.
+"""Sample Region route audit.
 
-Read-only audit surface for the Phase-4 cleanliness re-classification.
-Shows the active routes of the region filtered by cleanliness_status /
-dirty_reason / operator / unit / name, with per-route drill-down (map,
-stops, catalog rows, runtime, timeline).
+Read-only audit surface for the Phase-4 cleanliness re-classification of
+Sample Region route directions, filterable by cleanliness, reason, operator,
+canton and name, with per-route drill-down (map, stops, catalog rows,
+runtime, timeline).
 
-Wired in via `datamind_console/app.py` as the "Sample Region Audit" page.
+Route counts come from ``datamind_console.metrics.routes`` (one definition
+per number, see docs/METRICS.md). The old hard-coded "646 active routes"
+caption was the 2026-05-02 count, before the 2026-05-04 purge.
 """
 from __future__ import annotations
 
-import os
 from typing import Any, Dict, List
 
 import pandas as pd
-import psycopg2
-import psycopg2.extras
 import streamlit as st
+
+from datamind_console.db.db import query_all
+from datamind_console.i18n import status_label, t
+from datamind_console.metrics import routes as route_metrics
+from datamind_console.ui.components.kpi import Kpi, kpi_row
+from datamind_console.ui.components.page import page_header, section
+from datamind_console.ui.components.states import empty_state, error_state, loading
+from datamind_console.ui.components.status import Chip, status_badge
+from datamind_console.ui.formatting import format_date, format_number
+from datamind_console.ui.theme import palette
 
 
 # Maps the messy phase3_global_catalog_v1.sector_key into a canton/sub-sector
-# bucket the operator can filter by. Inline as a SQL fragment so we can use it
+# bucket the operator can filter by. Unassigned rows use the sentinel
+# '__unassigned__', translated at display time. Inline as a SQL fragment so we can use it
 # both in SELECT and in WHERE without repeating logic.
 _UNIT_CASE_SQL = """
   CASE
-    WHEN v.sector_key IS NULL OR v.sector_key='unassigned' THEN 'Sin asignar'
+    WHEN v.sector_key IS NULL OR v.sector_key='unassigned' THEN '__unassigned__'
     WHEN v.sector_key IN ('valle_de_los_chillos','Valle de Los Chillos','sangolqui')
       THEN 'Rumiñahui · Valle de los Chillos'
     WHEN v.sector_key='ANT_PEDRO_MONCAYO' THEN 'Pedro Moncayo'
@@ -49,7 +59,7 @@ _UNIT_CASE_SQL = """
     WHEN v.sector_key='Quito Urbano' THEN 'DMQ · Urbano'
     WHEN v.sector_key IN ('rumipamba','scala shopping','la salle','oton de velez')
       THEN 'DMQ · Otros'
-    ELSE COALESCE(v.sector_key, 'Sin asignar')
+    ELSE COALESCE(v.sector_key, '__unassigned__')
   END
 """
 
@@ -58,38 +68,18 @@ _UNIT_CASE_SQL = """
 # DB
 # ──────────────────────────────────────────────────────────────────────────
 
-def _dsn() -> str:
-    local_only = str(os.getenv("DATAMIND_LOCAL_ONLY_MODE", "")).strip().lower() in {
-        "1", "true", "t", "yes", "y", "on"
-    }
-    if local_only:
-        value = os.getenv("LOCAL_DB_DSN") or os.getenv("DATAMIND_LOCAL_DB_DSN")
-        if not value:
-            raise RuntimeError(
-                "Sample Region audit data is unavailable: configure LOCAL_DB_DSN for this local-only session. "
-                "Remote database fallbacks are disabled."
-            )
-        return value
-
-    value = os.getenv("DB_DSN") or os.getenv("LOCAL_DB_DSN")
-    if not value:
-        raise RuntimeError("DB_DSN or LOCAL_DB_DSN must be configured before loading audit data.")
-    return value
-
-
-@st.cache_resource(show_spinner=False)
-def _conn(dsn: str):
-    return psycopg2.connect(dsn)
-
-
 def _fetch(sql: str, params: tuple = ()) -> List[Dict[str, Any]]:
-    conn = _conn(_dsn())
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(sql, params)
-        try:
-            return cur.fetchall()
-        except psycopg2.ProgrammingError:
-            return []
+    """One read-only query via the canonical helper.
+
+    This used to run on a process-wide ``st.cache_resource`` psycopg2
+    connection that never committed, so after the first query it stayed
+    "idle in transaction" for the server's lifetime. It held locks on
+    ``route_prod.routes`` (blocking ALTER/migrations), and after any SQL
+    error every later query failed with "current transaction is aborted".
+    Each call now opens a connection, runs READ ONLY, ends the transaction
+    and closes it.
+    """
+    return query_all(sql, params, statement_timeout_ms=30_000)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -195,6 +185,13 @@ def _routes_table(
         LIMIT 1000;
     """, tuple(params))
     return pd.DataFrame(rows)
+
+
+def _distinct_stop_count(df: pd.DataFrame) -> int:
+    """Distinct stop nodes across the listed route directions (not references)."""
+    if "stop_ids" not in df:
+        return 0
+    return len({sid for ids in df["stop_ids"] if ids for sid in ids})
 
 
 @st.cache_data(ttl=120, show_spinner=False)
@@ -393,16 +390,21 @@ def _inventory_table(
     canton: str | None,
     agency_substr: str | None,
     name_substr: str | None,
+    deploy_scope: str = "all",
 ) -> pd.DataFrame:
     where = ["r.province='sample_region'"]
     params: list = []
+    if deploy_scope == "deployed":
+        where.append("r.deploy_status = 'active'")
+    elif deploy_scope == "not_deployed":
+        where.append("r.deploy_status IS DISTINCT FROM 'active'")
     if name_substr:
         where.append("r.route_name ILIKE %s")
         params.append(f"%{name_substr}%")
     if agency_substr:
         where.append("COALESCE(rs.operator_name, cs.operator, ac.agency_name) ILIKE %s")
         params.append(f"%{agency_substr}%")
-    if canton and canton != "Todos":
+    if canton:
         where.append(f"{_UNIT_CASE_SQL} = %s")
         params.append(canton)
 
@@ -411,10 +413,13 @@ def _inventory_table(
           r.route_id::text                        AS route_id,
           r.route_name,
           r.direction_id,
+          r.deploy_status,
+          r.cleanliness_status,
           COALESCE(rs.operator_name, cs.operator) AS agency,
           ac.agency_name                          AS gtfs_agency,
           {_UNIT_CASE_SQL}                        AS canton,
           COALESCE(array_length(r.stop_node_ids, 1), 0) AS n_stops,
+          r.stop_node_ids::text[]                 AS stop_ids,
           ROUND((ST_Length(r.geom::geography)/1000.0)::numeric, 1) AS km,
           r.canonical_sequence_ready              AS canon_ready
         FROM route_prod.routes r
@@ -461,108 +466,171 @@ def _distinct_agencies() -> List[str]:
 # View
 # ──────────────────────────────────────────────────────────────────────────
 
-def render_sample_region_audit_view(analytics: Any = None, audit: Any = None) -> None:  # noqa: ARG001
-    st.title("Sample Region Audit Dashboard")
-    st.caption("Phase-4 post-state, active routes of the region. Read-only.")
+_ALL = "All"            # internal filter sentinel used by _routes_table
+_NO_REASON = "(none)"   # internal filter sentinel used by _routes_table
+_SECTIONS = ("inventory", "routes", "stops", "cohort")
 
-    try:
-        kpis = _kpis()
-    except (RuntimeError, psycopg2.Error) as exc:
-        st.info(str(exc))
-        st.caption("This read-only regional audit remains available when its local database is configured.")
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _canonical_counts() -> Dict[str, int]:
+    return route_metrics.route_counts("sample_region")
+
+
+def _unit_label(value: Any) -> str:
+    if value in (None, "", "__unassigned__"):
+        return t("audit.unit.unassigned")
+    return str(value)
+
+
+def _route_map(polyline: List[Dict[str, float]], stops: List[Dict[str, Any]]) -> None:
+    """Route polyline + numbered stops on the themed basemap."""
+    import pydeck as pdk
+
+    pal = palette()
+    points = polyline or [{"lat": float(r["lat"]), "lon": float(r["lon"])} for r in stops]
+    if not points:
+        empty_state("audit.drill.no_geometry")
         return
+    lat0 = sum(p_["lat"] for p_ in points) / len(points)
+    lon0 = sum(p_["lon"] for p_ in points) / len(points)
+    layers = []
+    if polyline:
+        layers.append(pdk.Layer(
+            "PathLayer",
+            data=[{"path": [[p_["lon"], p_["lat"]] for p_ in polyline]}],
+            get_path="path", get_color=pal.rgba(pal.info, 230), width_scale=4, width_min_pixels=3,
+        ))
+    if stops:
+        layers.append(pdk.Layer(
+            "ScatterplotLayer",
+            data=stops,
+            get_position="[lon, lat]",
+            get_radius=22,
+            get_fill_color=pal.rgba(pal.accent, 235),
+            get_line_color=pal.rgba(pal.background, 255),
+            line_width_min_pixels=1,
+            stroked=True,
+            pickable=True,
+        ))
+    deck = pdk.Deck(
+        initial_view_state=pdk.ViewState(latitude=lat0, longitude=lon0, zoom=12),
+        layers=layers,
+        tooltip={"text": "{seq}. {name}"} if stops else None,
+        map_style=pal.map_style,
+    )
+    st.pydeck_chart(deck, height=440)
 
-    # KPI strip
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.metric("Total active", kpis["total"])
-    c2.metric("Ship-eligible", kpis["ship_eligible"], help="clean + phase4_catalog_synthesized")
-    c3.metric("Clean", kpis["clean"])
-    c4.metric("Stop quality pending", kpis["stop_quality"])
-    c5.metric("Stop duplicates", kpis["stop_dup"])
-    c6.metric("Canon gap (P3)", kpis["canon_gap"])
 
-    page = st.radio(
-        "Section",
-        options=["Route Inventory", "Routes", "Stops Quality", "Cohort Summary"],
-        horizontal=True,
-        label_visibility="collapsed",
+def render_sample_region_audit_view(analytics: Any = None, audit: Any = None) -> None:  # noqa: ARG001
+    page_header(
+        t("page.audit.title"),
+        t("page.audit.subtitle"),
+        eyebrow=t("page.audit.eyebrow"),
+        chips=[Chip(t("audit.read_only"), tone="info", icon=":material/visibility:")],
     )
 
-    if page == "Route Inventory":
+    try:
+        with loading("audit.loading"):
+            counts = _canonical_counts()
+            kpis = _kpis()
+    except Exception as exc:  # noqa: BLE001 - rendered and logged
+        error_state(exc, context_key="error.page.audit", key="audit.retry")
+        return
+
+    kpi_row([
+        Kpi(t("metric.route_directions_deployed.label"), counts["route_directions_deployed"], help=t("metric.route_directions_deployed.help")),
+        Kpi(t("metric.route_directions_clean.label"), counts["route_directions_clean"], help=t("metric.route_directions_clean.help")),
+        Kpi(t("metric.route_directions_ship_eligible.label"), counts["route_directions_ship_eligible"], help=t("metric.route_directions_ship_eligible.help")),
+        Kpi(t("metric.route_directions_needs_work.label"), counts["route_directions_needs_work"], help=t("metric.route_directions_needs_work.help")),
+        Kpi(t("metric.route_directions_not_deployed.label"), counts["route_directions_not_deployed"], help=t("metric.route_directions_not_deployed.help")),
+        Kpi(t("metric.lines_clean.label"), counts["lines_clean"], help=t("metric.lines_clean.help")),
+    ])
+    st.caption(t("audit.scope_note", total=format_number(counts["route_directions_total"]),
+                 deployed=format_number(counts["route_directions_deployed"]),
+                 not_deployed=format_number(counts["route_directions_not_deployed"])))
+    if kpis["canon_gap"] != counts["route_directions_needs_work"]:
+        st.caption(t("audit.reason_note", canon_gap=format_number(kpis["canon_gap"])))
+
+    page = st.segmented_control(
+        t("audit.section.label"),
+        options=list(_SECTIONS),
+        default=st.session_state.get("audit.section") or "inventory",
+        format_func=lambda key: t(f"audit.section.{key}"),
+        key="audit.section",
+        label_visibility="collapsed",
+    ) or "inventory"
+
+    if page == "inventory":
         _render_route_inventory()
-    elif page == "Cohort Summary":
-        _render_cohort_summary()
-    elif page == "Stops Quality":
+    elif page == "cohort":
+        _render_cohort_summary(kpis)
+    elif page == "stops":
         _render_stops_quality()
     else:
         _render_routes()
 
 
 def _render_route_inventory() -> None:
-    st.subheader("Route Inventory — Sample Region")
+    section(t("audit.inventory.title"), t("audit.inventory.caption"))
 
-    # Filters
-    f1, f2, f3 = st.columns(3)
+    f1, f2, f3, f4 = st.columns([0.24, 0.26, 0.26, 0.24])
     with f1:
-        cantons = ["Todos"] + _distinct_cantons()
-        canton = st.selectbox("Canton", cantons, index=0, key="inv.canton")
+        canton = st.selectbox(
+            t("audit.filter.canton"), [""] + _distinct_cantons(), index=0, key="inv.canton",
+            format_func=lambda v: t("filter.all") if v == "" else _unit_label(v),
+        )
     with f2:
-        agencies = ["Todos"] + _distinct_agencies()
-        agency_pick = st.selectbox("Agency / Operator", agencies, index=0, key="inv.agency")
+        agency_pick = st.selectbox(
+            t("audit.filter.agency"), [""] + _distinct_agencies(), index=0, key="inv.agency",
+            format_func=lambda v: t("filter.all") if v == "" else v,
+        )
     with f3:
-        name_q = st.text_input("Route name contains", value="", key="inv.name")
+        name_q = st.text_input(t("audit.filter.name"), value="", key="inv.name")
+    with f4:
+        deploy_scope = st.selectbox(
+            t("audit.filter.deploy_scope"), ["all", "deployed", "not_deployed"], index=0, key="inv.deploy_scope",
+            format_func=lambda v: t(f"audit.deploy_scope.{v}"),
+        )
 
-    agency_filter = None
-    if agency_pick and agency_pick != "Todos":
-        agency_filter = agency_pick
-
-    df = _inventory_table(
-        canton if canton != "Todos" else None,
-        agency_filter,
-        name_q.strip() or None,
-    )
-
+    df = _inventory_table(canton or None, agency_pick or None, name_q.strip() or None, deploy_scope)
     if df.empty:
-        st.info("No routes match these filters.")
+        empty_state("audit.no_match")
         return
 
-    # KPI row
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Routes", len(df))
-    k2.metric("Agencies", df["agency"].nunique())
-    k3.metric("Total stops", int(df["n_stops"].sum()))
-    k4.metric("Avg stops/route", f"{df['n_stops'].mean():.1f}")
+    kpi_row([
+        Kpi(t("audit.inventory.kpi.directions"), len(df), help=t("audit.inventory.kpi.directions_help")),
+        Kpi(t("audit.inventory.kpi.agencies"), int(df["agency"].nunique())),
+        Kpi(t("audit.inventory.kpi.stop_references"), int(df["n_stops"].sum()), help=t("audit.inventory.kpi.stop_references_help")),
+        Kpi(t("audit.inventory.kpi.distinct_stops"), _distinct_stop_count(df), help=t("audit.inventory.kpi.distinct_stops_help")),
+        Kpi(t("audit.inventory.kpi.avg_stops"), format_number(float(df["n_stops"].mean()), decimals=1)),
+    ])
 
+    view = df.copy()
+    view["canton"] = view["canton"].map(_unit_label)
+    view["deploy_status"] = view["deploy_status"].map(lambda v: status_label("deploy", v))
+    view["cleanliness_status"] = view["cleanliness_status"].map(lambda v: status_label("cleanliness", v))
     st.dataframe(
-        df[["route_name", "agency", "canton", "direction_id", "n_stops", "km", "canon_ready"]],
-        use_container_width=True,
+        view[["route_name", "agency", "canton", "direction_id", "deploy_status", "cleanliness_status", "n_stops", "km", "canon_ready"]],
         hide_index=True,
         height=420,
+        width="stretch",
         column_config={
-            "route_name": st.column_config.TextColumn("Route", width="large"),
-            "agency": st.column_config.TextColumn("Agency / Operator", width="medium"),
-            "canton": st.column_config.TextColumn("Canton", width="medium"),
-            "direction_id": st.column_config.NumberColumn("Dir", width="small"),
-            "n_stops": st.column_config.NumberColumn("Stops", width="small"),
-            "km": st.column_config.NumberColumn("km", width="small"),
-            "canon_ready": st.column_config.CheckboxColumn("Canon", width="small"),
+            "route_name": st.column_config.TextColumn(t("col.route"), width="medium"),
+            "agency": st.column_config.TextColumn(t("col.operator"), width="medium"),
+            "canton": st.column_config.TextColumn(t("col.canton"), width="medium"),
+            "direction_id": st.column_config.NumberColumn(t("col.direction"), width="small"),
+            "deploy_status": st.column_config.TextColumn(t("col.deploy_status"), width="medium"),
+            "cleanliness_status": st.column_config.TextColumn(t("col.cleanliness"), width="medium"),
+            "n_stops": st.column_config.NumberColumn(t("col.stops"), width="small"),
+            "km": st.column_config.NumberColumn(t("col.km"), width="small"),
+            "canon_ready": st.column_config.CheckboxColumn(t("col.canonical_sequence"), width="small", help=t("col.canonical_sequence_help")),
         },
     )
 
-    # Drill-down: select a route to see its stops
-    st.divider()
-    st.subheader("Route stops")
+    section(t("audit.inventory.stops_title"), divider=True)
     options = df["route_id"].tolist()
-    labels = {
-        r["route_id"]: f"{(r['route_name'] or '—')[:55]}  —  {r['agency'] or '?'}"
-        for _, r in df.iterrows()
-    }
-    pick = st.selectbox(
-        "Select a route",
-        options=options,
-        format_func=lambda rid: labels.get(rid, rid),
-        key="inv.pick",
-    )
+    labels = {r["route_id"]: f"{(r['route_name'] or '—')[:55]}  —  {r['agency'] or '?'}" for _, r in df.iterrows()}
+    pick = st.selectbox(t("audit.pick_route"), options=options, format_func=lambda rid: labels.get(rid, rid), key="inv.pick")
     if pick:
         _render_inventory_drilldown(pick)
 
@@ -570,131 +638,122 @@ def _render_route_inventory() -> None:
 def _render_inventory_drilldown(route_id: str) -> None:
     sdf = _route_stops(route_id)
     if sdf.empty:
-        st.info("No stops linked to this route.")
+        empty_state("audit.drill.no_stops")
         return
-
-    st.caption(f"{len(sdf)} stops")
-
+    st.caption(t("audit.drill.stop_count", n=format_number(len(sdf))))
     col_map, col_tbl = st.columns([0.5, 0.5])
-
     with col_tbl:
         st.dataframe(
             sdf[["seq", "name", "lat", "lon"]],
-            use_container_width=True,
-            hide_index=True,
-            height=400,
+            hide_index=True, height=440, width="stretch",
+            column_config={
+                "seq": st.column_config.NumberColumn(t("col.seq"), width="small"),
+                "name": st.column_config.TextColumn(t("col.stop_name")),
+                "lat": st.column_config.NumberColumn(t("col.lat"), format="%.6f"),
+                "lon": st.column_config.NumberColumn(t("col.lon"), format="%.6f"),
+            },
         )
-
     with col_map:
         valid = sdf.dropna(subset=["lat", "lon"])
-        if valid.empty:
-            st.info("No coordinates available.")
-        else:
-            polyline = _route_geom_polyline(route_id)
-            try:
-                import pydeck as pdk
-                lat0 = valid["lat"].astype(float).mean()
-                lon0 = valid["lon"].astype(float).mean()
-                layers = []
-                if polyline:
-                    layers.append(pdk.Layer(
-                        "PathLayer",
-                        data=[{"path": [[p["lon"], p["lat"]] for p in polyline]}],
-                        get_path="path", get_color=[30, 144, 255],
-                        width_scale=4, width_min_pixels=3,
-                    ))
-                stop_data = [
-                    {"lat": float(r["lat"]), "lon": float(r["lon"]),
-                     "seq": int(r["seq"]) if r.get("seq") is not None else 0,
-                     "name": str(r.get("name") or "")}
-                    for _, r in valid.iterrows()
-                ]
-                layers.append(pdk.Layer(
-                    "ScatterplotLayer",
-                    data=stop_data,
-                    get_position="[lon, lat]",
-                    get_radius=25,
-                    get_fill_color=[255, 99, 71],
-                    pickable=True,
-                ))
-                deck = pdk.Deck(
-                    initial_view_state=pdk.ViewState(latitude=lat0, longitude=lon0, zoom=12),
-                    layers=layers,
-                    tooltip={"text": "{seq}. {name}"},
-                    map_style=None,
-                )
-                st.pydeck_chart(deck, use_container_width=True)
-            except Exception as exc:
-                st.error(f"Map render failed: {exc}")
+        stops = [
+            {"lat": float(r["lat"]), "lon": float(r["lon"]), "seq": int(r["seq"]) if r.get("seq") is not None else 0, "name": str(r.get("name") or "")}
+            for _, r in valid.iterrows()
+        ]
+        try:
+            _route_map(_route_geom_polyline(route_id), stops)
+        except Exception as exc:  # noqa: BLE001 - rendered and logged
+            error_state(exc, context_key="audit.drill.map_failed", retry=False)
 
 
-def _render_cohort_summary() -> None:
-    st.subheader("Distribution by bucket")
+def _render_cohort_summary(kpis: Dict[str, int]) -> None:
+    section(t("audit.cohort.title"), t("audit.cohort.caption"))
     df = _bucket_breakdown()
     if df.empty:
-        st.info("No data.")
+        empty_state("audit.no_data")
         return
+
+    def _bucket_label(bucket: str) -> str:
+        if bucket.startswith("dirty/"):
+            return f"{status_label('cleanliness', 'dirty')} · {status_label('dirty_reason', bucket.split('/', 1)[1])}"
+        return status_label("cleanliness", bucket)
+
+    shown = pd.DataFrame({t("col.bucket"): df["bucket"].map(_bucket_label), t("col.route_directions"): df["n"]})
     col_a, col_b = st.columns([0.55, 0.45])
     with col_a:
-        st.bar_chart(df.set_index("bucket")["n"])
+        st.bar_chart(shown.set_index(t("col.bucket"))[t("col.route_directions")], horizontal=True)
     with col_b:
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(shown, hide_index=True, width="stretch")
 
-    st.subheader("Ship-readiness")
-    k = _kpis()
-    blockers = {
-        "Stop quality pending (Phase 1 stop names)": k["stop_quality"],
-        "Stop duplicate residual (Phase 1 dedup)":   k["stop_dup"],
-        "Canon gap (Phase 3 grounding)":             k["canon_gap"],
-        "Unprocessed (Phase 1–3 not run)":           k["unprocessed"],
-        "Unrealistic runtime (rare)":                k["runtime"],
-    }
-    st.dataframe(pd.DataFrame({"blocker": list(blockers), "routes": list(blockers.values())}),
-                 use_container_width=True, hide_index=True)
+    section(t("audit.cohort.blockers_title"), t("audit.cohort.blockers_caption"))
+    blockers = [
+        ("stop_quality_pending", kpis["stop_quality"]),
+        ("stop_duplicate_residual", kpis["stop_dup"]),
+        ("canon_gap", kpis["canon_gap"]),
+        ("unprocessed", kpis["unprocessed"]),
+        ("unrealistic_runtime", kpis["runtime"]),
+    ]
+    st.dataframe(
+        pd.DataFrame({
+            t("col.blocker"): [t(f"audit.blocker.{key}") for key, _ in blockers],
+            t("col.route_directions"): [n for _, n in blockers],
+        }),
+        hide_index=True,
+        width="stretch",
+    )
 
 
 def _render_routes() -> None:
-    st.subheader("Routes")
-
-    # Filters
+    section(t("audit.routes.title"), t("audit.routes.caption"))
     f1, f2, f3, f4, f5, f6 = st.columns([0.14, 0.18, 0.18, 0.16, 0.18, 0.16])
     with f1:
-        status = st.selectbox("Status", ["All", "clean", "dirty", "unprocessed"], index=0)
+        status = st.selectbox(t("audit.filter.status"), [_ALL, "clean", "dirty", "unprocessed"], index=0,
+                              format_func=lambda v: t("filter.all") if v == _ALL else status_label("cleanliness", v))
     with f2:
-        reasons = ["All", "(none)"] + _distinct_dirty_reasons()
-        reason = st.selectbox("Dirty reason", reasons, index=0)
+        reasons = [_ALL, _NO_REASON] + _distinct_dirty_reasons()
+        reason = st.selectbox(t("audit.filter.reason"), reasons, index=0,
+                              format_func=lambda v: t("filter.all") if v == _ALL else (t("filter.none") if v == _NO_REASON else status_label("dirty_reason", v)))
     with f3:
-        units = ["All"] + _distinct_units()
-        unit = st.selectbox("Unit / canton", units, index=0)
+        units = [_ALL] + _distinct_units()
+        unit = st.selectbox(t("audit.filter.unit"), units, index=0,
+                            format_func=lambda v: t("filter.all") if v == _ALL else _unit_label(v))
     with f4:
-        operator = st.text_input("Operator contains", value="")
+        operator = st.text_input(t("audit.filter.operator"), value="")
     with f5:
-        name_q = st.text_input("Route name contains", value="")
+        name_q = st.text_input(t("audit.filter.name"), value="")
     with f6:
-        route_id_q = st.text_input("Route ID (exact)", value="")
+        route_id_q = st.text_input(t("audit.filter.route_id"), value="")
 
-    df = _routes_table(
-        status, reason,
-        operator.strip() or None,
-        name_q.strip() or None,
-        route_id_q.strip() or None,
-        unit,
-    )
-
+    df = _routes_table(status, reason, operator.strip() or None, name_q.strip() or None, route_id_q.strip() or None, unit)
     if df.empty:
-        st.info("No routes match these filters.")
+        empty_state("audit.no_match")
         return
 
-    st.caption(f"{len(df)} route{'s' if len(df) != 1 else ''} matched (limit 1000).")
-    st.dataframe(df, use_container_width=True, hide_index=True, height=320)
+    st.caption(t("audit.routes.matched", n=format_number(len(df))))
+    view = df.copy()
+    view["status"] = view["status"].map(lambda v: status_label("cleanliness", v))
+    view["reason"] = view["reason"].map(lambda v: status_label("dirty_reason", v) if v else "—")
+    view["unit"] = view["unit"].map(_unit_label)
+    st.dataframe(
+        view,
+        hide_index=True, height=320, width="stretch",
+        column_config={
+            "route_id": None,
+            "route_name": st.column_config.TextColumn(t("col.route"), width="large"),
+            "status": st.column_config.TextColumn(t("col.cleanliness")),
+            "reason": st.column_config.TextColumn(t("col.reason")),
+            "conf": st.column_config.NumberColumn(t("col.naming_confidence"), format="%.2f", help=t("col.naming_confidence_help")),
+            "operator": st.column_config.TextColumn(t("col.operator")),
+            "short": st.column_config.TextColumn(t("col.short_name")),
+            "unit": st.column_config.TextColumn(t("col.canton")),
+            "km": st.column_config.NumberColumn(t("col.km")),
+            "n_stops": st.column_config.NumberColumn(t("col.stops")),
+        },
+    )
 
-    # Drill-down
-    st.divider()
-    st.subheader("Drill-down")
+    section(t("audit.drill.title"), divider=True)
     options = df["route_id"].tolist()
-    labels = {r["route_id"]: f"{(r['route_name'] or '—')[:60]}  ({r['status']}/{r['reason'] or '—'})"
-              for _, r in df.iterrows()}
-    pick = st.selectbox("Pick a route", options=options, format_func=lambda rid: labels.get(rid, rid))
+    labels = {r["route_id"]: f"{(r['route_name'] or '—')[:60]}  ({status_label('cleanliness', r['status'])})" for _, r in df.iterrows()}
+    pick = st.selectbox(t("audit.pick_route"), options=options, format_func=lambda rid: labels.get(rid, rid))
     if pick:
         _render_route_drilldown(pick)
 
@@ -702,124 +761,109 @@ def _render_routes() -> None:
 def _render_route_drilldown(route_id: str) -> None:
     detail = _route_detail(route_id)
     if not detail:
-        st.warning("Route not found.")
+        empty_state("audit.drill.not_found")
         return
 
-    head_a, head_b, head_c, head_d, head_e = st.columns(5)
-    head_a.metric("Status", str(detail.get("cleanliness_status") or "—"))
-    head_b.metric("Reason", str(detail.get("dirty_reason") or "—"))
+    with st.container(horizontal=True, gap="small"):
+        status_badge("cleanliness", detail.get("cleanliness_status"))
+        if detail.get("dirty_reason"):
+            status_badge("dirty_reason", detail.get("dirty_reason"))
+        if detail.get("canonical_sequence_ready"):
+            st.badge(t("audit.drill.canonical_ready"), color="green", icon=":material/check:")
+        if detail.get("legacy_grandfathered"):
+            st.badge(t("audit.drill.grandfathered"), color="gray")
     nc = detail.get("naming_confidence")
-    head_c.metric("Naming conf.", f"{float(nc):.2f}" if nc is not None else "—")
-    head_d.metric("Stops", int(detail.get("n_stops") or 0))
-    head_e.metric("Length (km)", f"{detail.get('km')}" if detail.get("km") is not None else "—")
+    kpi_row([
+        Kpi(t("col.naming_confidence"), format_number(float(nc), decimals=2) if nc is not None else "—", help=t("col.naming_confidence_help")),
+        Kpi(t("col.stops"), int(detail.get("n_stops") or 0)),
+        Kpi(t("audit.drill.length_km"), format_number(float(detail["km"]), decimals=1) if detail.get("km") is not None else "—"),
+        Kpi(t("col.direction"), detail.get("direction_id") if detail.get("direction_id") is not None else "—"),
+    ])
+    st.markdown(f"**{detail.get('route_name') or '—'}**")
+    st.caption(t("audit.drill.route_id", route_id=route_id))
 
-    st.markdown(f"**Route**: {detail.get('route_name','')}  \n"
-                f"**ID**: `{route_id}`  \n"
-                f"**Canon ready**: {bool(detail.get('canonical_sequence_ready'))}  ·  "
-                f"**Grandfathered**: {bool(detail.get('legacy_grandfathered'))}")
+    tabs = st.tabs([t("audit.drill.tab.map"), t("audit.drill.tab.stops"), t("audit.drill.tab.catalog"),
+                    t("audit.drill.tab.runtime"), t("audit.drill.tab.timeline")])
 
-    tabs = st.tabs(["Map", "Stops", "Catalog", "Runtime", "Timeline"])
-
-    # --- Map
     with tabs[0]:
-        polyline = _route_geom_polyline(route_id)
         stops_df = _route_stops(route_id)
-        if not polyline:
-            st.info("No geometry for this route.")
-        else:
-            try:
-                import pydeck as pdk
-                lat0 = sum(p["lat"] for p in polyline) / len(polyline)
-                lon0 = sum(p["lon"] for p in polyline) / len(polyline)
-                line_layer = pdk.Layer(
-                    "PathLayer", data=[{"path": [[p["lon"], p["lat"]] for p in polyline]}],
-                    get_path="path", get_color=[30, 144, 255], width_scale=4,
-                    width_min_pixels=3,
-                )
-                stop_layer = None
-                if not stops_df.empty:
-                    stop_data = stops_df.dropna(subset=["lat", "lon"]).to_dict("records")
-                    stop_layer = pdk.Layer(
-                        "ScatterplotLayer", data=stop_data,
-                        get_position="[lon, lat]", get_radius=20,
-                        get_fill_color=[255, 99, 71], pickable=True,
-                    )
-                layers = [line_layer] + ([stop_layer] if stop_layer else [])
-                deck = pdk.Deck(
-                    initial_view_state=pdk.ViewState(latitude=lat0, longitude=lon0, zoom=12),
-                    layers=layers,
-                    tooltip={"text": "{name}\nseq={seq}"} if stop_layer else None,
-                    map_style=None,
-                )
-                st.pydeck_chart(deck, use_container_width=True)
-            except Exception as exc:
-                st.error(f"Map render failed: {exc}")
+        stops = stops_df.dropna(subset=["lat", "lon"]).to_dict("records") if not stops_df.empty else []
+        try:
+            _route_map(_route_geom_polyline(route_id), stops)
+        except Exception as exc:  # noqa: BLE001 - rendered and logged
+            error_state(exc, context_key="audit.drill.map_failed", retry=False)
 
-    # --- Stops
     with tabs[1]:
         sdf = _route_stops(route_id)
         if sdf.empty:
-            st.info("No stops linked.")
+            empty_state("audit.drill.no_stops")
         else:
             def flag(row):
                 nm = (row.get("name") or "").strip()
                 if not nm:
-                    return "empty"
+                    return t("audit.stop_flag.empty")
                 low = nm.lower()
                 if low in ("parada", "parada aislada", "parada sin nombre", "sin nombre", "unnamed", "unknown", "na", "sn"):
-                    return "placeholder"
+                    return t("audit.stop_flag.placeholder")
                 if nm.startswith("Cerca de "):
-                    return "predicted"
+                    return t("audit.stop_flag.predicted")
                 return ""
             sdf = sdf.copy()
             sdf["flag"] = sdf.apply(flag, axis=1)
-            st.dataframe(sdf, use_container_width=True, hide_index=True, height=420)
+            st.dataframe(sdf, hide_index=True, height=420, width="stretch",
+                         column_config={"flag": st.column_config.TextColumn(t("col.name_quality"))})
 
-    # --- Catalog
     with tabs[2]:
         cat = _route_catalog(route_id)
-        st.markdown("**catalog.route_semantics**")
-        st.dataframe(pd.DataFrame(cat["semantics"]), use_container_width=True, hide_index=True)
-        st.markdown("**catalog.route_schedule_profile**")
-        st.dataframe(pd.DataFrame(cat["schedule"]), use_container_width=True, hide_index=True, height=180)
-        st.markdown("**catalog.route_service_days**")
-        st.dataframe(pd.DataFrame(cat["days"]), use_container_width=True, hide_index=True, height=160)
-        st.markdown("**catalog.route_layover_policy**")
-        st.dataframe(pd.DataFrame(cat["layover"]), use_container_width=True, hide_index=True)
-        with st.expander(f"catalog.route_service_exceptions ({len(cat['exceptions'])} rows)"):
-            st.dataframe(pd.DataFrame(cat["exceptions"]), use_container_width=True, hide_index=True)
+        st.caption(t("audit.drill.catalog_caption"))
+        for title_key, rows, height in (
+            ("audit.catalog.semantics", cat["semantics"], None),
+            ("audit.catalog.schedule", cat["schedule"], 180),
+            ("audit.catalog.service_days", cat["days"], 160),
+            ("audit.catalog.layover", cat["layover"], None),
+        ):
+            st.markdown(f"**{t(title_key)}**")
+            if rows:
+                st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch", **({"height": height} if height else {}))
+            else:
+                st.caption(t("audit.catalog.missing"))
+        with st.expander(t("audit.catalog.exceptions", n=len(cat["exceptions"]))):
+            st.dataframe(pd.DataFrame(cat["exceptions"]), hide_index=True, width="stretch")
 
-    # --- Runtime
     with tabs[3]:
         rdf = _route_runtime(route_id)
         if rdf.empty:
-            st.info("No runtime estimates for this route.")
+            empty_state("audit.drill.no_runtime")
         else:
-            st.dataframe(rdf, use_container_width=True, hide_index=True)
+            st.dataframe(rdf, hide_index=True, width="stretch")
 
-    # --- Timeline
     with tabs[4]:
-        st.markdown(
-            f"- **created/updated**: `{detail.get('updated_at')}`  \n"
-            f"- **semantics_updated_at**: `{detail.get('semantics_updated_at') or '—'}`  \n"
-            f"- **cleanliness_classified_at**: `{detail.get('cleanliness_classified_at') or '—'}`"
+        st.dataframe(
+            pd.DataFrame([
+                {t("col.event"): t("audit.timeline.updated"), t("col.when"): format_date(detail.get("updated_at"), with_time=True)},
+                {t("col.event"): t("audit.timeline.semantics"), t("col.when"): format_date(detail.get("semantics_updated_at"), with_time=True)},
+                {t("col.event"): t("audit.timeline.classified"), t("col.when"): format_date(detail.get("cleanliness_classified_at"), with_time=True)},
+            ]),
+            hide_index=True, width="stretch",
         )
+        st.caption(t("audit.timeline.note"))
 
 
 def _render_stops_quality() -> None:
-    st.subheader("Cohort stop quality")
+    section(t("audit.stops.title"), t("audit.stops.caption"))
     s = _stop_quality_summary()
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Total cohort stops", int(s.get("total") or 0))
-    c2.metric("Empty / null", int(s.get("empty") or 0))
-    c3.metric("Placeholder", int(s.get("placeholder") or 0))
-    c4.metric("Predicted (Cerca de)", int(s.get("predicted") or 0))
-    c5.metric("Superseded", int(s.get("superseded") or 0))
-
-    kind = st.selectbox("Show", ["empty", "placeholder", "predicted"], index=0)
+    kpi_row([
+        Kpi(t("audit.stops.total"), int(s.get("total") or 0), help=t("audit.stops.total_help")),
+        Kpi(t("audit.stop_flag.empty"), int(s.get("empty") or 0)),
+        Kpi(t("audit.stop_flag.placeholder"), int(s.get("placeholder") or 0)),
+        Kpi(t("audit.stop_flag.predicted"), int(s.get("predicted") or 0), help=t("audit.stops.predicted_help")),
+        Kpi(t("audit.stops.superseded"), int(s.get("superseded") or 0)),
+    ])
+    kind = st.selectbox(t("audit.stops.show"), ["empty", "placeholder", "predicted"], index=0,
+                        format_func=lambda k: t(f"audit.stop_flag.{k}"))
     df = _stops_with_issues_table(kind)
     if df.empty:
-        st.info("No stops match.")
+        empty_state("audit.stops.none")
     else:
-        st.caption(f"{len(df)} stops (limit 500)")
-        st.dataframe(df, use_container_width=True, hide_index=True, height=520)
+        st.caption(t("audit.stops.listed", n=format_number(len(df))))
+        st.dataframe(df, hide_index=True, height=520, width="stretch")

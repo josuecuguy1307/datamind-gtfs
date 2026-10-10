@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 
 import pydeck as pdk
 import streamlit as st
+from datamind_console.i18n import t, option_label
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
@@ -177,7 +178,7 @@ def _render_route_map(
         )
 
     if not layers:
-        st.info("No geometry or stop data available for this route.")
+        st.info(t("ui.p3.grounding_catalog.no_geometry_stop_data_available_this"))
         return
 
     center_lat = sum(all_lats) / len(all_lats)
@@ -235,9 +236,9 @@ def _route_status_badge(status: str) -> str:
 
 def _terminus_type_label(ttype: str) -> str:
     labels = {
-        "formal_terminal": "Terminal formal",
-        "street_terminus": "Terminus de calle (+40% bbox)",
-        "neighborhood_endpoint": "Barrio endpoint (+25% bbox)",
+        "formal_terminal": t("grounding.terminus.formal_terminal"),
+        "street_terminus": t("grounding.terminus.street_terminus"),
+        "neighborhood_endpoint": t("grounding.terminus.neighborhood_endpoint"),
     }
     return labels.get(ttype, ttype or "—")
 
@@ -277,13 +278,13 @@ def _build_route_table(catalog: Dict[str, Any], audit: Dict[str, Any]) -> List[D
         geom_km = a.get("geometry_km", a.get("geometry_length_km", "—"))
         if isinstance(geom_km, (int, float)):
             geom_km = f"{geom_km:.1f}"
-        pipeline_status = a.get("status", "not run")
+        pipeline_status = a.get("status") or t("grounding.not_run")
         terminus_survived = a.get("terminus_survived")
         term_label = "—"
         if terminus_survived is True:
-            term_label = f"survived ({a.get('terminus_distance_km', a.get('distance_to_expected_terminus_km', '?'))}km)"
+            term_label = t("grounding.terminus_survived", km=a.get('terminus_distance_km', a.get('distance_to_expected_terminus_km', '?')))
         elif terminus_survived is False:
-            term_label = f"PRUNED ({a.get('terminus_distance_km', a.get('distance_to_expected_terminus_km', '?'))}km)"
+            term_label = t("grounding.terminus_pruned", km=a.get('terminus_distance_km', a.get('distance_to_expected_terminus_km', '?')))
 
         rows.append({
             "Status": _route_status_badge(route_status),
@@ -307,15 +308,14 @@ def render_grounding_catalog_tab(ctx, client) -> None:
     del ctx, client
     ss = st.session_state
 
-    st.subheader("Stop Grounding Catalog (v3)")
+    st.subheader(t("ui.p3.grounding_catalog.stop_grounding_catalog_v3"))
     st.caption(
-        "Routes from the Valle de los Chillos hints catalog v3 with pipeline run results. "
-        "Includes jurisdiction, route type, and terminus type information."
+        t("ui.p3.grounding_catalog.routes_from_valle_de_los_chillos")
     )
 
     catalog = _load_v3_catalog()
     if not catalog:
-        st.error(f"V3 catalog not found at {V3_CATALOG}")
+        st.error(t("ui.p3.grounding_catalog.v3_catalog_not_found_at_v3", v3_catalog=(V3_CATALOG)))
         return
 
     audit = _load_pipeline_audit()
@@ -324,21 +324,21 @@ def render_grounding_catalog_tab(ctx, client) -> None:
     routes = catalog.get("routes", [])
     m1, m2, m3, m4 = st.columns(4)
     with m1:
-        st.metric("Total Routes", len(routes))
+        st.metric(t("ui.p3.grounding_catalog.total_routes"), len(routes))
     with m2:
         coops = set(r.get("cooperative", "") for r in routes)
-        st.metric("Cooperatives", len(coops))
+        st.metric(t("ui.p3.grounding_catalog.cooperatives"), len(coops))
     with m3:
         jurisdictions = {}
         for r in routes:
             j = r.get("jurisdiction", "both")
             jurisdictions[j] = jurisdictions.get(j, 0) + 1
-        st.metric("Jurisdictions", ", ".join(f"{k}:{v}" for k, v in sorted(jurisdictions.items())))
+        st.metric(t("ui.p3.grounding_catalog.jurisdictions"), ", ".join(f"{k}:{v}" for k, v in sorted(jurisdictions.items())))
     with m4:
         run_count = len(audit.get("route_audits", [])) or (
             len(audit.get("critical_route_audits", [])) + len(audit.get("remaining_v3_audits", []))
         )
-        st.metric("Pipeline Runs", run_count)
+        st.metric(t("ui.p3.grounding_catalog.pipeline_runs"), run_count)
 
     # ── Filters ──
     st.divider()
@@ -351,27 +351,31 @@ def render_grounding_catalog_tab(ctx, client) -> None:
 
     with f1:
         jurisdiction_filter = st.selectbox(
-            "Jurisdiction",
+            t("ui.p3.grounding_catalog.jurisdiction"),
             options=["all"] + all_jurisdictions,
             key="p3.grounding.jurisdiction_filter",
+            format_func=option_label(),
         )
     with f2:
         route_type_filter = st.selectbox(
-            "Route Type",
+            t("ui.p3.grounding_catalog.route_type"),
             options=["all"] + all_types,
             key="p3.grounding.route_type_filter",
+            format_func=option_label(),
         )
     with f3:
         coop_filter = st.selectbox(
-            "Cooperative",
+            t("ui.p3.grounding_catalog.cooperative"),
             options=["all"] + all_coops,
             key="p3.grounding.coop_filter",
+            format_func=option_label(),
         )
     with f4:
         status_filter = st.selectbox(
-            "Route Status",
+            t("ui.p3.grounding_catalog.route_status"),
             options=["all"] + all_statuses,
             key="p3.grounding.status_filter",
+            format_func=option_label(),
         )
 
     # ── Build and filter table ──
@@ -388,20 +392,24 @@ def render_grounding_catalog_tab(ctx, client) -> None:
         filtered = [r for r in filtered if r["route_status"] == status_filter]
 
     # Remove internal column before display
-    display_rows = [{k: v for k, v in r.items() if k != "route_status"} for r in filtered]
+    # Row keys stay English (filters use them); headers are translated for display only.
+    display_rows = [
+        {t(f"grounding.col.{k.lower().replace(' ', '_').replace('(', '').replace(')', '')}"): v for k, v in r.items() if k != "route_status"}
+        for r in filtered
+    ]
 
-    st.markdown(f"#### Route Catalog ({len(display_rows)} routes)")
+    st.markdown(t("ui.p3.grounding_catalog.route_catalog_n_display_rows_routes", n_display_rows=(len(display_rows))))
     if display_rows:
         st.dataframe(display_rows, use_container_width=True, hide_index=True, height=400)
     else:
-        st.info("No routes match the current filters.")
+        st.info(t("ui.p3.grounding_catalog.no_routes_match_current_filters"))
 
     # ── Route detail inspector ──
     if filtered:
         st.divider()
         route_names = [r["Route"] for r in filtered]
         selected_route = st.selectbox(
-            "Inspect route detail",
+            t("ui.p3.grounding_catalog.inspect_route_detail"),
             options=route_names,
             format_func=lambda name: next(
                 (f"{r['Status']} {r['Cooperative']} — {name}" for r in filtered if r["Route"] == name),
@@ -417,7 +425,7 @@ def render_grounding_catalog_tab(ctx, client) -> None:
                 detail_left, detail_right = st.columns(2)
 
                 with detail_left:
-                    st.markdown("**Catalog Entry**")
+                    st.markdown(t("ui.p3.grounding_catalog.catalog_entry"))
                     st.json({
                         "cooperative": entry.get("cooperative"),
                         "route": entry.get("route"),
@@ -433,7 +441,7 @@ def render_grounding_catalog_tab(ctx, client) -> None:
                     })
 
                 with detail_right:
-                    st.markdown("**Researched Anchors**")
+                    st.markdown(t("ui.p3.grounding_catalog.researched_anchors"))
                     anchors = entry.get("researched_anchors", [])
                     for anchor in anchors:
                         if isinstance(anchor, dict):
@@ -449,11 +457,11 @@ def render_grounding_catalog_tab(ctx, client) -> None:
                             st.markdown(f"- {anchor}")
 
                     if entry.get("schedule"):
-                        st.markdown("**Schedule**")
+                        st.markdown(t("ui.p3.grounding_catalog.schedule"))
                         st.json(entry["schedule"])
 
                     if entry.get("source_notes"):
-                        st.markdown("**Source Notes**")
+                        st.markdown(t("ui.p3.grounding_catalog.source_notes"))
                         for note in entry["source_notes"]:
                             st.caption(f"- {note}")
 
@@ -462,30 +470,22 @@ def render_grounding_catalog_tab(ctx, client) -> None:
             geometry = _load_route_geometry(selected_route, coop_name)
             skeleton = _load_route_skeleton(selected_route, coop_name)
             if geometry or skeleton or anchors:
-                st.markdown("**Route Geometry & Stops**")
+                st.markdown(t("ui.p3.grounding_catalog.route_geometry_stops"))
                 _render_route_map(geometry, skeleton, anchors, route_name=selected_route)
                 if skeleton:
                     stops = skeleton.get("ordered_stops", [])
                     st.caption(
-                        f"{len(stops)} skeleton stops | "
-                        f"{len(skeleton.get('marginal_stops', []))} marginal | "
-                        f"{skeleton.get('total_length_km', '?')} km corridor"
+                        t("ui.p3.grounding_catalog.n_stops_skeleton_stops_n_marginal", n_stops=(len(stops)), n_marginal_stops=(len(skeleton.get('marginal_stops', []))), total_length_km=(skeleton.get('total_length_km', '?')))
                     )
 
             # Pipeline artifacts
             artifact = _load_route_artifact(selected_route, coop_name)
             if artifact:
-                with st.expander("Pipeline Run Summary", expanded=False):
+                with st.expander(t("ui.p3.grounding_catalog.pipeline_run_summary"), expanded=False):
                     st.json(artifact)
 
     # ── Legend ──
-    with st.expander("Legend", expanded=False):
+    with st.expander(t("ui.p3.grounding_catalog.legend"), expanded=False):
         st.markdown(
-            "**Status badges:** 🟢 confirmed | 🟡 need_to_create | 🟠 probable | 🔵 pilot\n\n"
-            "**Jurisdiction:** DMQ = Distrito Metropolitano de Quito | ANT = Agencia Nacional de Tránsito | both = serves both\n\n"
-            "**Terminus types:**\n"
-            "- `formal_terminal`: Named terminal with OSM node\n"
-            "- `street_terminus`: Route ends at a street (bbox tolerance +40%)\n"
-            "- `neighborhood_endpoint`: Route ends at a neighborhood (bbox tolerance +25%)\n\n"
-            "**Pipeline status:** completed = full run | not run = pending"
+            t("ui.p3.grounding_catalog.status_badges_confirmed_need_create_probable")
         )

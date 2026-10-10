@@ -22,12 +22,18 @@ COMPETITOR_PROGRESS_GAP = 0.025
 
 
 def ensure_geometry_stop_recovery_schema(conn: Any) -> None:
-    sql_path = Path(__file__).resolve().parents[2] / "sql" / "027_geometry_stop_recovery.sql"
-    if not sql_path.exists():
-        return
-    sql = sql_path.read_text(encoding="utf-8")
-    with db_cursor(conn) as cur:
-        cur.execute(sql)
+    """Verify, read-only, that the geometry stop-recovery table exists.
+
+    This used to execute ``027_geometry_stop_recovery.sql`` on every call,
+    including read paths reached from the Phase 3 page. Applying it is now an
+    explicit administrative step:
+    ``python -m datamind_console.db.schema_cli apply phase3.geometry_stop_recovery --yes``.
+    The caller's transaction mode is not changed.
+    """
+    from datamind_console.db.schema_guard import require_on_connection
+    from datamind_console.phases.phase3_routes.schema import GEOMETRY_STOP_RECOVERY
+
+    require_on_connection(GEOMETRY_STOP_RECOVERY, conn)
 
 
 def _to_uuid_text(value: Any) -> Optional[str]:

@@ -34,6 +34,22 @@ class DeployCheckResult:
     value: Any = None
 
 
+def resolve_local_otp_dirs(cfg: OpsConfig) -> tuple[Optional[Path], Optional[Path]]:
+    """Return (OTP router dir, gtfs_app compose dir) from config, or None.
+
+    Both derive from ``GTFS_APP_ROOT`` / ``LOCAL_GTFS_EXTRACT_DIR``; there is
+    no machine-specific fallback, so a missing setting fails the check loudly.
+    """
+    root = Path(cfg.transportapp_root) if cfg.transportapp_root else None
+    if cfg.local_gtfs_extract_dir:
+        extract: Optional[Path] = Path(cfg.local_gtfs_extract_dir)
+    elif root is not None:
+        extract = root / "otp" / "otp-data" / "routers" / "default"
+    else:
+        extract = None
+    return extract, root
+
+
 @dataclass
 class DeployReport:
     passed: bool = True
@@ -263,9 +279,17 @@ class PreDeployEnforcer:
         """Build OTP graph locally, upload to EC2. NEVER build on EC2."""
         import subprocess
 
-        local_extract = cfg.local_gtfs_extract_dir or os.path.expanduser("~/gtfs_app/otp/otp-data/routers/default")
+        local_extract, compose_dir = resolve_local_otp_dirs(cfg)
+        if local_extract is None or compose_dir is None:
+            return DeployCheckResult(
+                name="local_graph_build",
+                passed=False,
+                details=(
+                    "gtfs_app location is not configured: set GTFS_APP_ROOT "
+                    "(or LOCAL_GTFS_EXTRACT_DIR for the OTP router directory)."
+                ),
+            )
         graph_path = Path(local_extract) / "graph.obj"
-        compose_dir = cfg.transportapp_root or os.path.expanduser("~/gtfs_app")
         compose_file = Path(compose_dir) / "docker-compose.yaml"
         if not compose_file.exists():
             compose_file = Path(compose_dir) / "docker-compose.yml"

@@ -4,28 +4,20 @@ from typing import Any
 
 import streamlit as st
 
+from datamind_console.i18n import t
+from datamind_console.ui import navigation
+from datamind_console.ui.components.page import page_header
 from datamind_console.views.gtfs_exports_view import render_gtfs_exports_section
 from datamind_console.widgets.gtfs_ops_widget import render_gtfs_ops_widget
 
 
 def render_gtfs_ops_view(*, analytics: Any = None, audit: Any = None, **_) -> None:
-    st.subheader("GTFS Operations")
-    st.caption("Validate and publish a GTFS package, then review the generated export.")
-    start_col, phase_col, revise_col = st.columns(3)
-    with start_col:
-        st.markdown("**1. Import / validate**")
-        st.caption("Use the GTFS ZIP controls below.")
-    with phase_col:
-        if st.button("2. Build in Phase 5", key="gtfs_ops.go_phase5", use_container_width=True):
-            st.session_state["ui.page"] = "Phases"
-            st.session_state["phases.current_phase"] = 5
-            st.rerun()
-    with revise_col:
-        if st.button("3. Revise current GTFS", key="gtfs_ops.go_revise", use_container_width=True):
-            st.session_state["ui.page"] = "Revise Current GTFS"
-            st.rerun()
+    page_header(t("page.gtfs.title"), t("page.gtfs.subtitle"), eyebrow=t("page.gtfs.eyebrow"))
+    with st.container(horizontal=True, gap="medium"):
+        navigation.link("phases", t("gtfs.link.build_phase5"), icon=":material/build:", phase=5)
+        navigation.link("revise_gtfs", t("gtfs.link.revise"), icon=":material/edit_road:")
 
-    tab_ops, tab_exports = st.tabs(["1. Import & publish", "2. Review exports"])
+    tab_ops, tab_exports = st.tabs([t("gtfs.tab.validate_publish"), t("gtfs.tab.exports")])
     with tab_ops:
         render_gtfs_ops_widget()
     with tab_exports:

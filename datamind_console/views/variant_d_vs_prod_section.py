@@ -20,6 +20,7 @@ import streamlit as st
 
 from datamind_console.db import db_conn, fetch_all
 from datamind_console.ui.components.maps import _deck_theme, _resolve_theme
+from datamind_console.i18n import t, option_label
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_SUMMARY = (
@@ -51,7 +52,7 @@ def _load_summary(path_str: str) -> List[Dict[str, Any]]:
         return []
 
 
-@st.cache_data(ttl=60, show_spinner="Loading enriched routes…")
+@st.cache_data(ttl=60, show_spinner=False)
 def _fetch_enriched(route_ids: tuple[str, ...]) -> List[Dict[str, Any]]:
     if not route_ids:
         return []
@@ -77,7 +78,7 @@ def _fetch_enriched(route_ids: tuple[str, ...]) -> List[Dict[str, Any]]:
         return []
 
 
-@st.cache_data(ttl=60, show_spinner="Loading pre-existing routes…")
+@st.cache_data(ttl=60, show_spinner=False)
 def _fetch_preexisting(sources: tuple[str, ...]) -> List[Dict[str, Any]]:
     if not sources:
         return []
@@ -109,7 +110,7 @@ def _fetch_preexisting(sources: tuple[str, ...]) -> List[Dict[str, Any]]:
         return []
 
 
-@st.cache_data(ttl=60, show_spinner="Loading stops…")
+@st.cache_data(ttl=60, show_spinner=False)
 def _fetch_stops_for(route_ids: tuple[str, ...]) -> List[Dict[str, Any]]:
     if not route_ids:
         return []
@@ -183,16 +184,14 @@ _COLOR_PREEXIST_STOP = [120, 180, 255, 230]
 
 def render_variant_d_vs_prod_section(summary_path: str | Path = _DEFAULT_SUMMARY) -> None:
     st.divider()
-    st.markdown("### TEMP: Variant-D enriched **vs** pre-existing prod — quito_sur")
+    st.markdown(t("ui.misc.variant_d_vs_prod_section.temp_variant_d_enriched_vs_pre"))
     st.caption(
-        "Red = newly enriched from Variant-D shards (`canton_pipeline_06a_quito_sur`). "
-        "Blue = pre-existing prod from OSM relations + earlier cycles. Remove this "
-        "section once quito_sur enrichment is signed off."
+        t("ui.misc.variant_d_vs_prod_section.red_newly_enriched_from_variant_d")
     )
 
     summary_rows = _load_summary(str(summary_path))
     if not summary_rows:
-        st.warning(f"No run_summary.json at `{summary_path}`. Run the driver first.")
+        st.warning(t("ui.misc.variant_d_vs_prod_section.no_run_summary_json_at_summary", summary_path=(summary_path)))
         return
 
     built = [r for r in summary_rows if r.get("status") == "built"]
@@ -214,24 +213,24 @@ def render_variant_d_vs_prod_section(summary_path: str | Path = _DEFAULT_SUMMARY
 
     # KPI row ---------------------------------------------------------
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.metric("Enriched", f"{len(enriched)}", f"{len(blocked)} blocked")
-    c2.metric("Pre-existing", f"{len(preexisting)}")
+    c1.metric(t("ui.misc.variant_d_vs_prod_section.enriched"), f"{len(enriched)}", f"{len(blocked)} blocked")
+    c2.metric(t("ui.misc.variant_d_vs_prod_section.pre_existing"), f"{len(preexisting)}")
     c3.metric(
-        "Enriched stops",
+        t("ui.misc.variant_d_vs_prod_section.enriched_stops"),
         f"{e_stops_total:,}",
         f"avg {e_stops_total / max(len(enriched), 1):.1f}",
     )
     c4.metric(
-        "Pre-existing stops",
+        t("ui.misc.variant_d_vs_prod_section.pre_existing_stops"),
         f"{p_stops_total:,}",
         f"avg {p_stops_total / max(len(preexisting), 1):.1f}",
     )
-    c5.metric("Enriched km", f"{e_km_total:,.1f}")
-    c6.metric("Pre-existing km", f"{p_km_total:,.1f}")
+    c5.metric(t("ui.misc.variant_d_vs_prod_section.enriched_km"), f"{e_km_total:,.1f}")
+    c6.metric(t("ui.misc.variant_d_vs_prod_section.pre_existing_km"), f"{p_km_total:,.1f}")
 
     # Blocked shards expander ----------------------------------------
     if blocked:
-        with st.expander(f"⚠️  {len(blocked)} blocked shards — show details"):
+        with st.expander(t("ui.misc.variant_d_vs_prod_section.n_blocked_blocked_shards_show_details", n_blocked=(len(blocked)))):
             st.dataframe(
                 pd.DataFrame(
                     [
@@ -248,8 +247,7 @@ def render_variant_d_vs_prod_section(summary_path: str | Path = _DEFAULT_SUMMARY
                 hide_index=True,
             )
             st.caption(
-                "Most likely cause: seed anchors could not be resolved to any node during "
-                "grounding. Investigate seed JSON vs node_prod coverage."
+                t("ui.misc.variant_d_vs_prod_section.most_likely_cause_seed_anchors_could")
             )
 
     # Name overlap (possible duplicates) -----------------------------
@@ -279,10 +277,9 @@ def render_variant_d_vs_prod_section(summary_path: str | Path = _DEFAULT_SUMMARY
                     }
                 )
     if overlaps:
-        st.markdown("#### 🔁 Possible duplicates (name overlap)")
+        st.markdown(t("ui.misc.variant_d_vs_prod_section.possible_duplicates_name_overlap"))
         st.caption(
-            "Routes whose normalized name appears in both sets — candidates for "
-            "deduplication / reconciliation."
+            t("ui.misc.variant_d_vs_prod_section.routes_whose_normalized_name_appears_both")
         )
         st.dataframe(
             pd.DataFrame(overlaps).sort_values("Δ stops", ascending=False),
@@ -321,9 +318,9 @@ def render_variant_d_vs_prod_section(summary_path: str | Path = _DEFAULT_SUMMARY
         }
         for c, v in coop_agg.items()
     ]
-    st.markdown("#### By cooperative")
+    st.markdown(t("ui.misc.variant_d_vs_prod_section.by_cooperative"))
     if not coop_rows:
-        st.info("No cooperative comparison is available for the selected data source.")
+        st.info(t("ui.misc.variant_d_vs_prod_section.no_cooperative_comparison_available_selected_data"))
     else:
         coop_df = pd.DataFrame(coop_rows).sort_values(
             by=["variant_d_routes", "pre_routes"], ascending=False
@@ -339,10 +336,10 @@ def render_variant_d_vs_prod_section(summary_path: str | Path = _DEFAULT_SUMMARY
         )
 
     # Side-by-side tables --------------------------------------------
-    st.markdown("#### Route lists")
+    st.markdown(t("ui.misc.variant_d_vs_prod_section.route_lists"))
     left, right = st.columns(2)
     with left:
-        st.markdown("**Variant-D enriched (new)**")
+        st.markdown(t("ui.misc.variant_d_vs_prod_section.variant_d_enriched_new"))
         df_l = pd.DataFrame(
             [
                 {
@@ -367,7 +364,7 @@ def render_variant_d_vs_prod_section(summary_path: str | Path = _DEFAULT_SUMMARY
             },
         )
     with right:
-        st.markdown("**Pre-existing in prod**")
+        st.markdown(t("ui.misc.variant_d_vs_prod_section.pre_existing_prod"))
         df_r = pd.DataFrame(
             [
                 {
@@ -394,21 +391,22 @@ def render_variant_d_vs_prod_section(summary_path: str | Path = _DEFAULT_SUMMARY
         )
 
     # Paired map -----------------------------------------------------
-    st.markdown("#### Side-by-side map")
+    st.markdown(t("ui.misc.variant_d_vs_prod_section.side_by_side_map"))
     ctrl_l, ctrl_m, ctrl_r = st.columns([2, 2, 1])
     all_coops = sorted(coop_agg.keys())
     with ctrl_l:
         picked_coop = st.selectbox(
-            "Filter by cooperative", ["All"] + all_coops, index=0, key="vd_vs_prod.coop"
+            t("ui.misc.variant_d_vs_prod_section.filter_by_cooperative"), ["All"] + all_coops, index=0, key="vd_vs_prod.coop",
+            format_func=option_label(),
         )
     with ctrl_m:
         show_stops = st.checkbox(
-            "Show stops", value=False, key="vd_vs_prod.show_stops",
-            help="Adds stop markers to the map. Only the current selection is queried.",
+            t("ui.misc.variant_d_vs_prod_section.show_stops"), value=False, key="vd_vs_prod.show_stops",
+            help=t("ui.misc.variant_d_vs_prod_section.adds_stop_markers_map_only_current"),
         )
     with ctrl_r:
-        show_e = st.checkbox("Red", value=True, key="vd_vs_prod.show_e")
-        show_p = st.checkbox("Blue", value=True, key="vd_vs_prod.show_p")
+        show_e = st.checkbox(t("ui.misc.variant_d_vs_prod_section.red"), value=True, key="vd_vs_prod.show_e")
+        show_p = st.checkbox(t("ui.misc.variant_d_vs_prod_section.blue"), value=True, key="vd_vs_prod.show_p")
 
     if picked_coop == "All":
         e_pool = enriched
@@ -422,11 +420,13 @@ def render_variant_d_vs_prod_section(summary_path: str | Path = _DEFAULT_SUMMARY
     p_names = ["All pre-existing"] + [r.get("route_name") for r in p_pool]
     with c_left:
         pick_e = st.selectbox(
-            "Variant-D route", e_names, index=0, key="vd_vs_prod.pick_e"
+            t("ui.misc.variant_d_vs_prod_section.variant_d_route"), e_names, index=0, key="vd_vs_prod.pick_e",
+            format_func=lambda v: t("vd.all_variant_d") if v == "All Variant-D" else v,
         )
     with c_right:
         pick_p = st.selectbox(
-            "Pre-existing route", p_names, index=0, key="vd_vs_prod.pick_p"
+            t("ui.misc.variant_d_vs_prod_section.pre_existing_route"), p_names, index=0, key="vd_vs_prod.pick_p",
+            format_func=lambda v: t("vd.all_pre_existing") if v == "All pre-existing" else v,
         )
 
     sel_e = e_pool if pick_e == "All Variant-D" else [r for r in e_pool if r.get("route_name") == pick_e]
@@ -455,7 +455,7 @@ def render_variant_d_vs_prod_section(summary_path: str | Path = _DEFAULT_SUMMARY
         stops_p = _fetch_stops_for(tuple(r["route_id"] for r in sel_p if r.get("route_id")))
 
     if not path_e and not path_p and not stops_e and not stops_p:
-        st.info("No renderable geometries for the current selection.")
+        st.info(t("ui.misc.variant_d_vs_prod_section.no_renderable_geometries_current_selection"))
         return
 
     all_lats: list[float] = []
@@ -571,6 +571,5 @@ def render_variant_d_vs_prod_section(summary_path: str | Path = _DEFAULT_SUMMARY
     )
     st.pydeck_chart(deck, use_container_width=True, height=600)
     st.caption(
-        f"🔴 {len(path_e)} Variant-D path(s), {len(stops_e)} stop(s). "
-        f"🔵 {len(path_p)} pre-existing path(s), {len(stops_p)} stop(s)."
+        t("ui.misc.variant_d_vs_prod_section.n_path_e_variant_d_path", n_path_e=(len(path_e)), n_stops_e=(len(stops_e)), n_path_p=(len(path_p)), n_stops_p=(len(stops_p)))
     )
