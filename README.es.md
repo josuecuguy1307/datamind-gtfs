@@ -16,8 +16,10 @@ Un pipeline y una consola de operador open source. Convierte datos abiertos de m
 ![Salida: GTFS](https://img.shields.io/badge/salida-GTFS-d99a2b)
 ![Revisión humana](https://img.shields.io/badge/revisi%C3%B3n-humana-d99a2b)
 ![Origen: Antari](https://img.shields.io/badge/naci%C3%B3%20de-la%20app%20Antari-5b5f73)
+[![Hecho con Claude Code](https://img.shields.io/badge/hecho%20con-Claude%20Code-D97757?logo=claude&logoColor=white)](#hecho-con-claude)
 
 [**▶ Ver el recorrido por la consola**](#recorrido-por-la-consola) &nbsp;·&nbsp;
+[Hecho con Claude](#hecho-con-claude) &nbsp;·&nbsp;
 [Cómo funciona](#cómo-funciona) &nbsp;·&nbsp;
 [Flujo de trabajo](#flujo-de-trabajo-típico) &nbsp;·&nbsp;
 [Inicio rápido](#inicio-rápido) &nbsp;·&nbsp;
@@ -63,6 +65,31 @@ https://github.com/user-attachments/assets/f634cf72-a150-4647-8c69-1a7f9836e610
 > [!NOTE]
 > **Nacido de una necesidad real de un producto de transporte. Caso de uso downstream: Antari.**
 > Antari es la app de movilidad para usuarios que dejó al descubierto el problema de los datos. DataMind nació de ahí como la **infraestructura de datos upstream**: Antari consume datos de transporte y DataMind los produce. Son productos distintos: Antari es donde apareció el problema, y es el uso downstream para el que se construye la salida de DataMind.
+
+---
+
+## Hecho con Claude
+
+<a href="#hecho-con-claude"><img src="https://img.shields.io/badge/Hecho%20con-Claude%20Code-D97757?style=for-the-badge&logo=claude&logoColor=white" alt="Hecho con Claude Code"></a> <img src="https://img.shields.io/badge/conectado%20por-MCP%20·%20solo%20lectura-1f1b4d?style=for-the-badge&logo=claude&logoColor=white" alt="Conectado por MCP, solo lectura">
+
+Durante dos meses llenamos los huecos de los datos casi a mano, y era lento. El 25 de febrero de 2026 sumamos a **Claude Code** al proyecto como orquestador del pipeline. Ejecutó nuestros motores fase por fase, siguiendo nuestros propios playbooks, y llegó a la base de datos a través de un **servidor MCP** que escribimos para él. El ritmo cambió en días.
+
+https://github.com/user-attachments/assets/ecbd7b14-2567-403c-ae1d-ea7e59109152
+
+<sub>«La historia», 90 segundos, con las fechas y cifras reales de nuestra base de datos y del historial de git.</sub>
+
+| | Antes de Claude <br><sub>enero – febrero de 2026</sub> | Con Claude como orquestador |
+|---|---|---|
+| **Corridas de extracción de OpenStreetMap** | 42 en dos meses | **1.392** en la semana del 2 de marzo |
+| **Registros de ruta limpios** | 7 | **241** construidos en cuatro semanas (30 de marzo – 26 de abril) |
+| **Investigación de huecos** | a mano | **2.075** huecos investigados y **3.592** puntos de referencia propuestos (23 de abril – 6 de mayo), cada uno comprobado por nuestro código |
+| **Resultado** | | **218 líneas de bus limpias** en la región de Quito (275 registros de un sentido) |
+| **Guayaquil** | | **301** sentidos de ruta construidos con el mismo pipeline **en tres días** (9 – 11 de abril de 2026), **98** desplegados. Su revisión de limpieza sigue pendiente |
+
+**Por qué el MCP fue esencial.** El MCP le dio a Claude una ventana segura al trabajo: `tools/mcp_server.py` expone **18 herramientas, todas de solo lectura** (catálogo de rutas, detalle de ruta, resúmenes por fase, corridas de extracción, decisiones recientes, `query_db`…). Claude podía ver el estado real de cada ruta y de cada fase, compararlo con referencias y decidir qué ejecutar después, **sin poder cambiar ni una fila por su cuenta**. Los motores que ejecutó son nuestro propio código, y nuestros playbooks (skills, uno por fase) le indicaban cómo ejecutarlos.
+
+> [!IMPORTANT]
+> **Claude hizo el trabajo a velocidad. Nosotros mantuvimos el control.** Nada se publica sin la aprobación de una persona, y las 794 paradas que el sistema rellenó en rutas limpias siguen marcadas como pendientes de revisión. Son las fechas y cifras propias de nuestro proyecto en Ecuador; no hacemos ninguna comparación con otros equipos ni instituciones.
 
 ---
 

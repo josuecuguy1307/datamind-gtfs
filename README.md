@@ -16,8 +16,10 @@ An open-source pipeline and operator console. It turns open map data and field e
 ![Output: GTFS](https://img.shields.io/badge/output-GTFS-d99a2b)
 ![Human in the loop](https://img.shields.io/badge/human-in%20the%20loop-d99a2b)
 ![Origin: Antari](https://img.shields.io/badge/born%20from-Antari%20transit%20app-5b5f73)
+[![Built with Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-D97757?logo=claude&logoColor=white)](#built-with-claude)
 
 [**▶ Watch the console tour**](#console-tour) &nbsp;·&nbsp;
+[Built with Claude](#built-with-claude) &nbsp;·&nbsp;
 [How it works](#how-it-works) &nbsp;·&nbsp;
 [Typical workflow](#typical-workflow) &nbsp;·&nbsp;
 [Quickstart](#quickstart) &nbsp;·&nbsp;
@@ -63,6 +65,31 @@ https://github.com/user-attachments/assets/f634cf72-a150-4647-8c69-1a7f9836e610
 > [!NOTE]
 > **Built from a real transit product need. Downstream use case: Antari.**
 > Antari is the rider-facing mobility app that exposed the data problem. DataMind grew out of it as the **upstream data infrastructure**: Antari consumes transit data, and DataMind produces it. They are separate products: Antari is where the problem was found, and it is the downstream use that DataMind's output is built for.
+
+---
+
+## Built with Claude
+
+<a href="#built-with-claude"><img src="https://img.shields.io/badge/Built%20with-Claude%20Code-D97757?style=for-the-badge&logo=claude&logoColor=white" alt="Built with Claude Code"></a> <img src="https://img.shields.io/badge/connected%20through-MCP%20·%20read--only-1f1b4d?style=for-the-badge&logo=claude&logoColor=white" alt="Connected through MCP, read-only">
+
+For two months we filled the gaps in the data mostly by hand, and it was slow. On 25 February 2026 we brought **Claude Code** into the project as the orchestrator of the pipeline. It ran our engines phase by phase, following our own playbooks, and reached the database through an **MCP server** we wrote for it. The pace changed in days.
+
+https://github.com/user-attachments/assets/9d37f051-21b7-4c58-8954-e519f9e1f29c
+
+<sub>«The Story», 90 seconds, with the real dates and counts from our database and git history.</sub>
+
+| | Before Claude <br><sub>January – February 2026</sub> | With Claude as orchestrator |
+|---|---|---|
+| **OpenStreetMap extraction runs** | 42 in two months | **1,392** in the week of 2 March |
+| **Clean route records** | 7 | **241** built in four weeks (30 March – 26 April) |
+| **Gap research** | by hand | **2,075** gaps researched and **3,592** landmarks proposed (23 April – 6 May), every one checked by our code |
+| **Result** | | **218 clean bus lines** in the Quito region (275 one-direction records) |
+| **Guayaquil** | | **301** route directions built with the same pipeline **in three days** (9 – 11 April 2026), **98** deployed. Their cleanliness review is still pending |
+
+**Why MCP was essential.** MCP gave Claude a safe window into the work: `tools/mcp_server.py` exposes **18 tools, all read-only** (route catalog, route detail, phase summaries, extraction runs, recent decisions, `query_db`…). Claude could inspect the real state of every route and every phase, compare it against references and decide what to run next, **without being able to change a single row on its own**. The engines it ran are our own code, and our playbooks (skills, one per phase) told it how to run them.
+
+> [!IMPORTANT]
+> **Claude did the work at speed. We stayed in control.** Nothing is published without a person's approval, and the 794 stops the system filled on clean routes are still marked as pending review. These are our project's own dates and counts from Ecuador; we make no comparison with other teams or institutions.
 
 ---
 
