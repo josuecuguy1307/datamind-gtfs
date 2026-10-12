@@ -17,19 +17,27 @@ Un pipeline y una consola de operador open source. Convierte datos abiertos de m
 ![Revisión humana](https://img.shields.io/badge/revisi%C3%B3n-humana-d99a2b)
 ![Origen: Antari](https://img.shields.io/badge/naci%C3%B3%20de-la%20app%20Antari-5b5f73)
 
-[**▶ Ver el recorrido por la consola**](docs/media/datamind-console-demo.mp4) &nbsp;·&nbsp;
+[**▶ Ver el recorrido por la consola**](#recorrido-por-la-consola) &nbsp;·&nbsp;
 [Cómo funciona](#cómo-funciona) &nbsp;·&nbsp;
 [Flujo de trabajo](#flujo-de-trabajo-típico) &nbsp;·&nbsp;
 [Inicio rápido](#inicio-rápido) &nbsp;·&nbsp;
 [Documentación](#documentación)
 
-<a href="docs/media/datamind-console-demo.mp4">
+<a href="#recorrido-por-la-consola">
   <img src="docs/media/hero-route-map.webp" alt="La consola de DataMind: una ruta de bus reconstruida en Quito dibujada sobre el mapa, con sus 11 paradas en orden" width="900">
 </a>
 
 <sub>Una ruta reconstruida por DataMind (*Bolivia – Tejar – Chorrera*, Quito): el trazado sigue las calles y las paradas aparecen en orden. Haz clic para ver un recorrido de 70 segundos por la consola (interfaz en inglés).</sub>
 
 </div>
+
+## Recorrido por la consola
+
+Setenta segundos en la consola real, sin narración: una ruta en el mapa, una limpieza antes y después, las colas de revisión, la puerta de validación GTFS y el alcance de la IA.
+
+https://github.com/user-attachments/assets/f634cf72-a150-4647-8c69-1a7f9836e610
+
+<sub>¿No ves el reproductor? [Descarga el video](docs/media/datamind-console-demo.mp4).</sub>
 
 ---
 

@@ -17,19 +17,27 @@ An open-source pipeline and operator console. It turns open map data and field e
 ![Human in the loop](https://img.shields.io/badge/human-in%20the%20loop-d99a2b)
 ![Origin: Antari](https://img.shields.io/badge/born%20from-Antari%20transit%20app-5b5f73)
 
-[**▶ Watch the console tour**](docs/media/datamind-console-demo.mp4) &nbsp;·&nbsp;
+[**▶ Watch the console tour**](#console-tour) &nbsp;·&nbsp;
 [How it works](#how-it-works) &nbsp;·&nbsp;
 [Typical workflow](#typical-workflow) &nbsp;·&nbsp;
 [Quickstart](#quickstart) &nbsp;·&nbsp;
 [Docs](#documentation)
 
-<a href="docs/media/datamind-console-demo.mp4">
+<a href="#console-tour">
   <img src="docs/media/hero-route-map.webp" alt="The DataMind console: a reconstructed bus route in Quito drawn over the map, with its 11 stops listed in order" width="900">
 </a>
 
 <sub>A route rebuilt by DataMind (*Bolivia – Tejar – Chorrera*, Quito): the geometry follows the streets and the stops come in order. Click to watch a 70-second tour of the console.</sub>
 
 </div>
+
+## Console tour
+
+Seventy seconds in the real console, no narration: a route on the map, a cleanup before and after, the review queues, the GTFS validation gate and the AI scope.
+
+https://github.com/user-attachments/assets/f634cf72-a150-4647-8c69-1a7f9836e610
+
+<sub>Can't see the player? [Download the video](docs/media/datamind-console-demo.mp4).</sub>
 
 ---
 
