@@ -1,0 +1,24 @@
+valid_lang_codes
+valid_timezones
+calendar
+calendar_dates
+service_days
+agency
+routes
+shapes
+trips
+frequencies
+stops
+stop_times
+stats_by_route_date
+AssertionError [ERR_ASSERTION]: opt.statsByRouteIdAndDate: materialized-view is currently not supported
+    at createStatsByRouteAndDateView (/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/scripts/gtfs_consumers/node_modules/gtfs-via-duckdb/lib/stats_by_route_date.js:11:3)
+    at convertGtfsToSql (/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/scripts/gtfs_consumers/node_modules/gtfs-via-duckdb/index.js:185:10) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: undefined,
+  expected: undefined,
+  operator: 'fail',
+  diff: 'simple',
+  gtfsFile: 'stats_by_route_date'
+}

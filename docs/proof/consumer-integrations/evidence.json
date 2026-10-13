@@ -1,0 +1,547 @@
+{
+  "status": "pass_with_known_upstream_defect",
+  "timestamp_utc": "2026-10-13T20:43:35.452848+00:00",
+  "invocation": [
+    "/opt/homebrew/opt/python@3.14/bin/python3.14",
+    "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/scripts/gtfs_consumers/run.py",
+    "--feed",
+    "../../outputs/synthetic-gtfs-proof/synthetic-gtfs.zip",
+    "--output",
+    "../consumer-clean-checkout/.cache/verified-consumers",
+    "--postgres-bin",
+    "/opt/homebrew/opt/postgresql@17/bin",
+    "--transitland",
+    "../consumer-clean-checkout/.cache/transitland-v1.3.4",
+    "--download-transitland"
+  ],
+  "feed_sha256": "602b8192c4f91f5f064942e582db4bb6bbded89c83c1ddde49207ad1eeb6eea5",
+  "claim": "CC0 synthetic consumer fixture; not Phase 5 or real-city output",
+  "commands": [
+    {
+      "command": [
+        "node",
+        "--version"
+      ],
+      "started_at_utc": "2026-10-13T20:43:35.453362+00:00",
+      "expected_returncode": 0,
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-01.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-01.stderr.txt"
+    },
+    {
+      "command": [
+        "/opt/homebrew/Cellar/postgresql@17/17.7/bin/postgres",
+        "--version"
+      ],
+      "started_at_utc": "2026-10-13T20:43:35.478093+00:00",
+      "expected_returncode": 0,
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-02.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-02.stderr.txt"
+    },
+    {
+      "command": [
+        "/opt/homebrew/Cellar/postgresql@17/17.7/bin/initdb",
+        "-D",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/pgdata",
+        "-U",
+        "proof",
+        "--auth=trust",
+        "--no-locale",
+        "-E",
+        "UTF8"
+      ],
+      "started_at_utc": "2026-10-13T20:43:35.491128+00:00",
+      "expected_returncode": 0,
+      "isolated_connection": {
+        "PGHOST": "/tmp/dm-gtfs-socket-fbxox8z4",
+        "PGPORT": "5432",
+        "PGUSER": "proof",
+        "PGDATABASE": "postgres",
+        "PGCONNECT_TIMEOUT": "5"
+      },
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-03.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-03.stderr.txt"
+    },
+    {
+      "command": [
+        "/opt/homebrew/Cellar/postgresql@17/17.7/bin/pg_ctl",
+        "-D",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/pgdata",
+        "-l",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/postgres.log",
+        "-o",
+        "-k /tmp/dm-gtfs-socket-fbxox8z4 -c listen_addresses='' -c unix_socket_permissions=0700",
+        "-w",
+        "start"
+      ],
+      "started_at_utc": "2026-10-13T20:43:36.373793+00:00",
+      "expected_returncode": 0,
+      "isolated_connection": {
+        "PGHOST": "/tmp/dm-gtfs-socket-fbxox8z4",
+        "PGPORT": "5432",
+        "PGUSER": "proof",
+        "PGDATABASE": "postgres",
+        "PGCONNECT_TIMEOUT": "5"
+      },
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-04.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-04.stderr.txt"
+    },
+    {
+      "command": [
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/scripts/gtfs_consumers/node_modules/.bin/gtfs-to-sql",
+        "--require-dependencies",
+        "--",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/agency.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/calendar.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/calendar_dates.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/feed_info.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/routes.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/shapes.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/stop_times.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/stops.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/trips.txt"
+      ],
+      "started_at_utc": "2026-10-13T20:43:36.490751+00:00",
+      "expected_returncode": 0,
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/import.sql",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-05.stderr.txt"
+    },
+    {
+      "command": [
+        "/opt/homebrew/Cellar/postgresql@17/17.7/bin/psql",
+        "-X",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-f",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/import.sql"
+      ],
+      "started_at_utc": "2026-10-13T20:43:36.863801+00:00",
+      "expected_returncode": 0,
+      "isolated_connection": {
+        "PGHOST": "/tmp/dm-gtfs-socket-fbxox8z4",
+        "PGPORT": "5432",
+        "PGUSER": "proof",
+        "PGDATABASE": "postgres",
+        "PGCONNECT_TIMEOUT": "5"
+      },
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-06.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-06.stderr.txt"
+    },
+    {
+      "command": [
+        "/opt/homebrew/Cellar/postgresql@17/17.7/bin/psql",
+        "-X",
+        "-At",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose",
+        "-c",
+        "SELECT version(),postgis_full_version();"
+      ],
+      "started_at_utc": "2026-10-13T20:43:37.131042+00:00",
+      "expected_returncode": 0,
+      "isolated_connection": {
+        "PGHOST": "/tmp/dm-gtfs-socket-fbxox8z4",
+        "PGPORT": "5432",
+        "PGUSER": "proof",
+        "PGDATABASE": "postgres",
+        "PGCONNECT_TIMEOUT": "5"
+      },
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-07.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-07.stderr.txt"
+    },
+    {
+      "command": [
+        "/opt/homebrew/Cellar/postgresql@17/17.7/bin/psql",
+        "-X",
+        "-At",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose",
+        "-f",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/scripts/gtfs_consumers/postgres.sql"
+      ],
+      "started_at_utc": "2026-10-13T20:43:37.160692+00:00",
+      "expected_returncode": 0,
+      "isolated_connection": {
+        "PGHOST": "/tmp/dm-gtfs-socket-fbxox8z4",
+        "PGPORT": "5432",
+        "PGUSER": "proof",
+        "PGDATABASE": "postgres",
+        "PGCONNECT_TIMEOUT": "5"
+      },
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-08.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-08.stderr.txt"
+    },
+    {
+      "command": [
+        "/opt/homebrew/Cellar/postgresql@17/17.7/bin/psql",
+        "-X",
+        "-At",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose",
+        "-f",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/shape-srid-repro.sql"
+      ],
+      "started_at_utc": "2026-10-13T20:43:37.247918+00:00",
+      "expected_returncode": 3,
+      "isolated_connection": {
+        "PGHOST": "/tmp/dm-gtfs-socket-fbxox8z4",
+        "PGPORT": "5432",
+        "PGUSER": "proof",
+        "PGDATABASE": "postgres",
+        "PGCONNECT_TIMEOUT": "5"
+      },
+      "returncode": 3,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-09.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-09.stderr.txt"
+    },
+    {
+      "command": [
+        "/opt/homebrew/Cellar/postgresql@17/17.7/bin/psql",
+        "-X",
+        "-At",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose",
+        "-c",
+        "SELECT json_build_object('source_srid',min(ST_SRID(shape_pt_loc::geometry)), 'fixed_start_matches', ST_Equals(ST_StartPoint(ST_MakeLine(shape_pt_loc::geometry ORDER BY shape_pt_sequence)), (SELECT stop_loc::geometry FROM stops WHERE stop_id='S1'))) FROM shapes WHERE shape_id='shape_0';"
+      ],
+      "started_at_utc": "2026-10-13T20:43:37.271239+00:00",
+      "expected_returncode": 0,
+      "isolated_connection": {
+        "PGHOST": "/tmp/dm-gtfs-socket-fbxox8z4",
+        "PGPORT": "5432",
+        "PGUSER": "proof",
+        "PGDATABASE": "postgres",
+        "PGCONNECT_TIMEOUT": "5"
+      },
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-10.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-10.stderr.txt"
+    },
+    {
+      "command": [
+        "/opt/homebrew/Cellar/postgresql@17/17.7/bin/pg_ctl",
+        "-D",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/pgdata",
+        "-m",
+        "fast",
+        "-w",
+        "stop"
+      ],
+      "started_at_utc": "2026-10-13T20:43:37.292023+00:00",
+      "expected_returncode": 0,
+      "isolated_connection": {
+        "PGHOST": "/tmp/dm-gtfs-socket-fbxox8z4",
+        "PGPORT": "5432",
+        "PGUSER": "proof",
+        "PGDATABASE": "postgres",
+        "PGCONNECT_TIMEOUT": "5"
+      },
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-11.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-11.stderr.txt"
+    },
+    {
+      "command": [
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/scripts/gtfs_consumers/node_modules/.bin/gtfs-to-duckdb",
+        "--require-dependencies",
+        "--",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/feed.duckdb",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/agency.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/calendar.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/calendar_dates.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/feed_info.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/routes.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/shapes.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/stop_times.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/stops.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/trips.txt"
+      ],
+      "started_at_utc": "2026-10-13T20:43:37.506769+00:00",
+      "expected_returncode": 0,
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-12.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-12.stderr.txt"
+    },
+    {
+      "command": [
+        "node",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/scripts/gtfs_consumers/query_duckdb.cjs",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/feed.duckdb",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/scripts/gtfs_consumers/duckdb.sql"
+      ],
+      "started_at_utc": "2026-10-13T20:43:38.870811+00:00",
+      "expected_returncode": 0,
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-13.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-13.stderr.txt"
+    },
+    {
+      "command": [
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/scripts/gtfs_consumers/node_modules/.bin/gtfs-to-duckdb",
+        "--stats-by-route-date",
+        "materialized-view",
+        "--require-dependencies",
+        "--",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/unsupported-materialized.duckdb",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/agency.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/calendar.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/calendar_dates.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/feed_info.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/routes.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/shapes.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/stop_times.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/stops.txt",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/gtfs/trips.txt"
+      ],
+      "started_at_utc": "2026-10-13T20:43:39.049855+00:00",
+      "expected_returncode": 1,
+      "returncode": 1,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-14.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-14.stderr.txt"
+    },
+    {
+      "command": [
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/transitland-v1.3.4",
+        "version"
+      ],
+      "started_at_utc": "2026-10-13T20:43:47.919150+00:00",
+      "expected_returncode": 0,
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-15.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-15.stderr.txt"
+    },
+    {
+      "command": [
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/transitland-v1.3.4",
+        "validate",
+        "--include-entities",
+        "--out",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/transitland-report.json",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/outputs/synthetic-gtfs-proof/synthetic-gtfs.zip"
+      ],
+      "started_at_utc": "2026-10-13T20:43:48.600586+00:00",
+      "expected_returncode": 0,
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-16.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-16.stderr.txt"
+    },
+    {
+      "command": [
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/transitland-v1.3.4",
+        "copy",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/outputs/synthetic-gtfs-proof/synthetic-gtfs.zip",
+        "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/transitland-roundtrip.zip"
+      ],
+      "started_at_utc": "2026-10-13T20:43:48.625593+00:00",
+      "expected_returncode": 0,
+      "returncode": 0,
+      "stdout": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-17.stdout.txt",
+      "stderr": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/command-17.stderr.txt"
+    }
+  ],
+  "consumers": {
+    "postgres": {
+      "status": "pass_with_known_upstream_defect",
+      "importer": "gtfs-via-postgres",
+      "version": "4.12.0",
+      "engine": "postgres (PostgreSQL) 17.7 (Homebrew)",
+      "full_versions": "PostgreSQL 17.7 (Homebrew) on aarch64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.4.4.1), 64-bit|POSTGIS=\"3.6.1 0\" [EXTENSION] PGSQL=\"170\" GEOS=\"3.14.1-CAPI-1.20.5\" PROJ=\"9.7.0 NETWORK_ENABLED=OFF URL_ENDPOINT=https://cdn.proj.org USER_WRITABLE_DIRECTORY=/Users/bebeta/Library/Application Support/proj DATABASE_PATH=/opt/homebrew/Cellar/proj/9.7.0/share/proj/proj.db\" (compiled against PROJ 9.7.0) LIBXML=\"2.15.1\" LIBJSON=\"0.18\" LIBPROTOBUF=\"1.5.2\" WAGYU=\"0.5.0 (Internal)\"",
+      "metrics": {
+        "agency": 1,
+        "routes": 1,
+        "stops": 3,
+        "trips": 4,
+        "stop_times": 12,
+        "shape_points": 6,
+        "shapes": 2,
+        "shape_srid": 0,
+        "stop_srid": 4326,
+        "calendar": 1,
+        "calendar_dates": 1,
+        "feed_info": 1,
+        "service_days": 364,
+        "arrivals_departures": 4368,
+        "connections": 2912,
+        "orphan_stop_times": 0,
+        "orphan_negative_control": 1,
+        "orphan_trips": 0,
+        "orphan_routes": 0,
+        "exception_service_days": 0,
+        "exception_departures": 0,
+        "next_service_departures": 12,
+        "first_service_departures": 12,
+        "after_midnight_expanded": 1,
+        "prior_service_on_exception_clock_date": 5,
+        "max_departure_seconds": 88500.0,
+        "max_departure_interval": "24:35:00",
+        "near_stops": 1,
+        "far_stops": 0,
+        "adjacent_distance_m": 553.48644774,
+        "correct_shape_starts": 2,
+        "reversed_times": 0
+      },
+      "candidate_fix_control": {
+        "source_srid": 4326,
+        "fixed_start_matches": true
+      },
+      "upstream_defect": {
+        "issue": "https://github.com/public-transport/gtfs-via-postgres/issues/48",
+        "failing_sql": "SELECT ST_Equals(ST_StartPoint(sh.shape),s.stop_loc::geometry)\nFROM shapes_aggregated sh JOIN stops s ON s.stop_id='S1' WHERE sh.shape_id='shape_0';\n",
+        "psql_returncode": 3,
+        "error": "psql:/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/shape-srid-repro.sql:2: ERROR:  XX000: ST_Equals: Operation on mixed SRID geometries (Point, 0) != (Point, 4326)\nLOCATION:  pg_error, lwgeom_pg.c:363\n"
+      },
+      "workaround": "Only shape joins restore WGS84 via ST_SetSRID; original view remains SRID 0.",
+      "isolated": {
+        "tcp": false,
+        "socket": "/tmp/dm-gtfs-socket-fbxox8z4",
+        "inherited_dsn": false
+      }
+    },
+    "duckdb": {
+      "status": "pass",
+      "importer": "gtfs-via-duckdb",
+      "version": "5.0.1",
+      "engine": "v1.4.4",
+      "node_api": "1.4.4-r.4",
+      "metrics": {
+        "agency": "1",
+        "routes": "1",
+        "stops": "3",
+        "trips": "4",
+        "stop_times": "12",
+        "shape_points": "6",
+        "shapes": "2",
+        "calendar": "1",
+        "calendar_dates": "1",
+        "feed_info": "1",
+        "service_days": "364",
+        "arrivals_departures": "4368",
+        "connections": "2912",
+        "orphan_stop_times": "0",
+        "orphan_negative_control": "1",
+        "orphan_trips": "0",
+        "orphan_routes": "0",
+        "exception_service_days": "0",
+        "exception_departures": "0",
+        "next_service_departures": "12",
+        "first_service_departures": "12",
+        "after_midnight_expanded": "1",
+        "prior_service_on_exception_clock_date": "5",
+        "max_departure_seconds": 88500,
+        "max_departure_interval": "24:35:00",
+        "near_stops": "1",
+        "far_stops": "0",
+        "adjacent_distance_m": 553.4864477363936,
+        "correct_shape_starts": "2",
+        "reversed_times": "0"
+      },
+      "unsupported_materialized_view": {
+        "returncode": 1,
+        "stderr": "valid_lang_codes\nvalid_timezones\ncalendar\ncalendar_dates\nservice_days\nagency\nroutes\nshapes\ntrips\nfrequencies\nstops\nstop_times\nstats_by_route_date\nAssertionError [ERR_ASSERTION]: opt.statsByRouteIdAndDate: materialized-view is currently not supported\n    at createStatsByRouteAndDateView (/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/scripts/gtfs_consumers/node_modules/gtfs-via-duckdb/lib/stats_by_route_date.js:11:3)\n    at convertGtfsToSql (/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/scripts/gtfs_consumers/node_modules/gtfs-via-duckdb/index.js:185:10) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: undefined,\n  operator: 'fail',\n  diff: 'simple',\n  gtfsFile: 'stats_by_route_date'\n}\n"
+      },
+      "spatial_units": "metres via spheroid after explicitly flipping stored lon/lat to lat/lon"
+    },
+    "transitland": {
+      "status": "pass",
+      "version": "v1.3.4",
+      "full_version": "transitland-lib version: v1.3.4\ntransitland-lib commit: https://github.com/interline-io/transitland-lib/commit/64f508789d6ae75bfe913fb46e9f86556ee621d7 (time: 2026-06-10T09:10:26Z)\nGTFS specification version: https://github.com/google/transit/blob/e62ea02efd8987cd6a5eaf8438de7feef9303857/gtfs/spec/en/reference.md\nGTFS Realtime specification version: https://github.com/google/transit/blob/7b9f229dfa0b539c3fcf461986638890024feb06/gtfs-realtime/proto/gtfs-realtime.proto",
+      "binary_asset": "transitland-macos-apple",
+      "binary_sha256": "c8da1716051b3a56bc475c75ee6fc0a5dbd385d7fe917ac278b2b7903d421c32",
+      "rows": {
+        "agency": 1,
+        "calendar": 1,
+        "calendar_dates": 1,
+        "feed_info": 1,
+        "routes": 1,
+        "shapes": 6,
+        "stop_times": 12,
+        "stops": 3,
+        "trips": 4
+      },
+      "errors": {},
+      "warnings": {},
+      "success": true,
+      "roundtrip_original_fields": "semantics preserved; numeric formatting and shape sequence identifiers normalized",
+      "roundtrip_transformations": {
+        "stops": [
+          "stop_lat",
+          "stop_lon"
+        ],
+        "stop_times": [
+          "shape_dist_traveled"
+        ],
+        "shape_sequences": {
+          "shape_1": {
+            "source": [
+              1,
+              2,
+              3
+            ],
+            "copied": [
+              0,
+              3,
+              6
+            ]
+          },
+          "shape_0": {
+            "source": [
+              1,
+              2,
+              3
+            ],
+            "copied": [
+              0,
+              3,
+              6
+            ]
+          }
+        },
+        "shapes": [
+          "shape_dist_traveled",
+          "shape_pt_lat",
+          "shape_pt_lon",
+          "shape_pt_sequence"
+        ]
+      },
+      "roundtrip_sha256": "c34c73c139ad9afb447268dce0578054c693876d28976e2f21502658ee280290",
+      "roundtrip_scope": "local derived artifact; not published"
+    }
+  },
+  "canonical_reference": {
+    "path": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/docs/proof/synthetic-gtfs/evidence.json",
+    "sha256": "0c7f2a2f2b80972d23c680ac68b07761ddb620a91c1d48e3256918bc7736bb40",
+    "unchanged": true
+  },
+  "node_version": "v26.5.0",
+  "npm_lock_sha256": "1170c8f505301a1e35fdbc248a334684bedab6964e8399f5b1683318f30cc04a",
+  "npm_packages": {
+    "gtfs-via-postgres": {
+      "version": "4.12.0",
+      "integrity": "sha512-ygBjKBJAjwmMfu7GKI0+0i9U5wypwW2TRDa/PtNb/lHy+uI4uaQrZJOXgrjF2Ih+Nimoj4dsyGG/LKnpKpMn+g=="
+    },
+    "gtfs-via-duckdb": {
+      "version": "5.0.1",
+      "integrity": "sha512-C66mA9VDkRTPFWXRAf0iVyRFPUS0szwWOF5PMgPqua4Ce3wqAGIpoz52LscH5FKoDbHZ/uglsi+pHGtngtsVbQ=="
+    },
+    "@duckdb/node-api": {
+      "version": "1.4.4-r.4",
+      "integrity": "sha512-yUotG8wPSmmEFxAODt07rXJZgV2fhvzhnZX3wrMspQNEaNVwXArzakgKyfakZkYL9me7SK9eDnXYv/XbdifWEg=="
+    }
+  },
+  "completed_at_utc": "2026-10-13T20:43:48.645425+00:00"
+}

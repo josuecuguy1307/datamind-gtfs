@@ -1,0 +1,2 @@
+psql:/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/consumer-clean-checkout/.cache/verified-consumers/shape-srid-repro.sql:2: ERROR:  XX000: ST_Equals: Operation on mixed SRID geometries (Point, 0) != (Point, 4326)
+LOCATION:  pg_error, lwgeom_pg.c:363

@@ -77,3 +77,6 @@ local_runner/inbox/*
 local_runner/processing/*
 local_runner/results/*
 !local_runner/*/.gitkeep
+
+# Local third-party consumer installs
+scripts/gtfs_consumers/node_modules/

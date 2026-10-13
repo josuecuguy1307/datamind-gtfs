@@ -1,0 +1,435 @@
+{
+  "validator": "transitland-lib",
+  "validator_version": "v1.3.4",
+  "success": true,
+  "failure_reason": null,
+  "reported_at": "2026-10-13T20:43:48.613446Z",
+  "reported_at_local": "2026-10-13T14:43:48.613446-06:00",
+  "reported_at_local_timezone": "America/Mexico_City",
+  "file": null,
+  "includes_static": true,
+  "includes_rt": false,
+  "details": {
+    "sha1": "21e6398e525b5463bf5cafa1c41cc120b2a6217c",
+    "timezone": null,
+    "earliest_calendar_date": "2026-10-13",
+    "latest_calendar_date": "2027-10-12",
+    "agencies": [
+      {
+        "agency_id": "synthetic",
+        "agency_name": "Synthetic DataMind Test Transit",
+        "agency_url": "https://example.org",
+        "agency_timezone": "America/Mexico_City",
+        "agency_lang": "en",
+        "agency_phone": null,
+        "agency_fare_url": null,
+        "agency_email": null,
+        "id": 0,
+        "feed_version_id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ],
+    "routes": [
+      {
+        "route_id": "R1",
+        "agency_id": "synthetic",
+        "route_short_name": "S1",
+        "route_long_name": "Synthetic Test Corridor",
+        "route_desc": null,
+        "route_type": 3,
+        "route_url": null,
+        "route_color": "004488",
+        "route_text_color": "FFFFFF",
+        "route_sort_order": null,
+        "continuous_pickup": null,
+        "continuous_drop_off": null,
+        "network_id": null,
+        "as_route": null,
+        "geometry": null,
+        "id": 0,
+        "feed_version_id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ],
+    "stops": [
+      {
+        "stop_id": "S1",
+        "stop_name": "Synthetic Stop 1",
+        "stop_code": null,
+        "stop_desc": null,
+        "stop_lat": 19.43,
+        "stop_lon": -99.14,
+        "zone_id": null,
+        "stop_url": null,
+        "tts_stop_name": null,
+        "platform_code": null,
+        "location_type": 0,
+        "parent_station": null,
+        "stop_timezone": null,
+        "wheelchair_boarding": null,
+        "level_id": null,
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -99.14,
+            19.43
+          ]
+        },
+        "id": 0,
+        "feed_version_id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "stop_id": "S2",
+        "stop_name": "Synthetic Stop 2",
+        "stop_code": null,
+        "stop_desc": null,
+        "stop_lat": 19.435,
+        "stop_lon": -99.14,
+        "zone_id": null,
+        "stop_url": null,
+        "tts_stop_name": null,
+        "platform_code": null,
+        "location_type": 0,
+        "parent_station": null,
+        "stop_timezone": null,
+        "wheelchair_boarding": null,
+        "level_id": null,
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -99.14,
+            19.435
+          ]
+        },
+        "id": 0,
+        "feed_version_id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "stop_id": "S3",
+        "stop_name": "Synthetic Stop 3",
+        "stop_code": null,
+        "stop_desc": null,
+        "stop_lat": 19.44,
+        "stop_lon": -99.14,
+        "zone_id": null,
+        "stop_url": null,
+        "tts_stop_name": null,
+        "platform_code": null,
+        "location_type": 0,
+        "parent_station": null,
+        "stop_timezone": null,
+        "wheelchair_boarding": null,
+        "level_id": null,
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -99.14,
+            19.44
+          ]
+        },
+        "id": 0,
+        "feed_version_id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ],
+    "feed_infos": [
+      {
+        "feed_publisher_name": "Synthetic DataMind Test Fixture (CC0)",
+        "feed_publisher_url": "https://example.org",
+        "feed_lang": "en",
+        "feed_version": "synthetic-v1-20261013",
+        "feed_start_date": "2026-10-13",
+        "feed_end_date": "2027-10-12",
+        "default_lang": "en",
+        "feed_contact_email": null,
+        "feed_contact_url": "https://example.org",
+        "id": 0,
+        "feed_version_id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ],
+    "files": [
+      {
+        "name": "agency.txt",
+        "size": 148,
+        "rows": 1,
+        "columns": 0,
+        "header": "agency_id,agency_name,agency_url,agency_timezone,agency_lang",
+        "csvlike": true,
+        "sha1": "ec95d417b34ced413536a9a28e1a0955cda5b2ce",
+        "values_unique": {
+          "agency_id": 1,
+          "agency_lang": 1,
+          "agency_name": 1,
+          "agency_timezone": 1,
+          "agency_url": 1
+        },
+        "values_count": {
+          "agency_id": 1,
+          "agency_lang": 1,
+          "agency_name": 1,
+          "agency_timezone": 1,
+          "agency_url": 1
+        },
+        "feed_version_id": 0,
+        "id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "name": "calendar.txt",
+        "size": 128,
+        "rows": 1,
+        "columns": 0,
+        "header": "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date",
+        "csvlike": true,
+        "sha1": "a7612916d845425f7f2851977181d15882108a77",
+        "values_unique": {
+          "end_date": 1,
+          "friday": 1,
+          "monday": 1,
+          "saturday": 1,
+          "service_id": 1,
+          "start_date": 1,
+          "sunday": 1,
+          "thursday": 1,
+          "tuesday": 1,
+          "wednesday": 1
+        },
+        "values_count": {
+          "end_date": 1,
+          "friday": 1,
+          "monday": 1,
+          "saturday": 1,
+          "service_id": 1,
+          "start_date": 1,
+          "sunday": 1,
+          "thursday": 1,
+          "tuesday": 1,
+          "wednesday": 1
+        },
+        "feed_version_id": 0,
+        "id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "name": "calendar_dates.txt",
+        "size": 50,
+        "rows": 1,
+        "columns": 0,
+        "header": "service_id,date,exception_type",
+        "csvlike": true,
+        "sha1": "67300d6626e8b45c4381e26310ad9d5a3b9d7dc0",
+        "values_unique": {
+          "date": 1,
+          "exception_type": 1,
+          "service_id": 1
+        },
+        "values_count": {
+          "date": 1,
+          "exception_type": 1,
+          "service_id": 1
+        },
+        "feed_version_id": 0,
+        "id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "name": "feed_info.txt",
+        "size": 268,
+        "rows": 1,
+        "columns": 0,
+        "header": "feed_publisher_name,feed_publisher_url,feed_lang,default_lang,feed_start_date,feed_end_date,feed_version,feed_contact_email,feed_contact_url",
+        "csvlike": true,
+        "sha1": "f22dc5e1660d67bff6154c9aa5cc8470bdb563dd",
+        "values_unique": {
+          "default_lang": 1,
+          "feed_contact_url": 1,
+          "feed_end_date": 1,
+          "feed_lang": 1,
+          "feed_publisher_name": 1,
+          "feed_publisher_url": 1,
+          "feed_start_date": 1,
+          "feed_version": 1
+        },
+        "values_count": {
+          "default_lang": 1,
+          "feed_contact_url": 1,
+          "feed_end_date": 1,
+          "feed_lang": 1,
+          "feed_publisher_name": 1,
+          "feed_publisher_url": 1,
+          "feed_start_date": 1,
+          "feed_version": 1
+        },
+        "feed_version_id": 0,
+        "id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "name": "routes.txt",
+        "size": 150,
+        "rows": 1,
+        "columns": 0,
+        "header": "route_id,agency_id,route_short_name,route_long_name,route_type,route_color,route_text_color",
+        "csvlike": true,
+        "sha1": "ca6d094ae7f016bd17c01a358cbeea76c4747e23",
+        "values_unique": {
+          "agency_id": 1,
+          "route_color": 1,
+          "route_id": 1,
+          "route_long_name": 1,
+          "route_short_name": 1,
+          "route_text_color": 1,
+          "route_type": 1
+        },
+        "values_count": {
+          "agency_id": 1,
+          "route_color": 1,
+          "route_id": 1,
+          "route_long_name": 1,
+          "route_short_name": 1,
+          "route_text_color": 1,
+          "route_type": 1
+        },
+        "feed_version_id": 0,
+        "id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "name": "shapes.txt",
+        "size": 312,
+        "rows": 6,
+        "columns": 0,
+        "header": "shape_id,shape_pt_lat,shape_pt_lon,shape_pt_sequence,shape_dist_traveled",
+        "csvlike": true,
+        "sha1": "84090e602d5277ff9006ce7f1d9807d32daa3319",
+        "values_unique": {
+          "shape_dist_traveled": 3,
+          "shape_id": 2,
+          "shape_pt_lat": 3,
+          "shape_pt_lon": 1,
+          "shape_pt_sequence": 3
+        },
+        "values_count": {
+          "shape_dist_traveled": 6,
+          "shape_id": 6,
+          "shape_pt_lat": 6,
+          "shape_pt_lon": 6,
+          "shape_pt_sequence": 6
+        },
+        "feed_version_id": 0,
+        "id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "name": "stop_times.txt",
+        "size": 577,
+        "rows": 12,
+        "columns": 0,
+        "header": "trip_id,arrival_time,departure_time,stop_id,stop_sequence,timepoint,shape_dist_traveled",
+        "csvlike": true,
+        "sha1": "8563d3c6b48ca568b8255f8fd80cae6114220b9d",
+        "values_unique": {
+          "arrival_time": 12,
+          "departure_time": 12,
+          "shape_dist_traveled": 3,
+          "stop_id": 3,
+          "stop_sequence": 3,
+          "timepoint": 1,
+          "trip_id": 4
+        },
+        "values_count": {
+          "arrival_time": 12,
+          "departure_time": 12,
+          "shape_dist_traveled": 12,
+          "stop_id": 12,
+          "stop_sequence": 12,
+          "timepoint": 12,
+          "trip_id": 12
+        },
+        "feed_version_id": 0,
+        "id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "name": "stops.txt",
+        "size": 183,
+        "rows": 3,
+        "columns": 0,
+        "header": "stop_id,stop_name,stop_lat,stop_lon,location_type",
+        "csvlike": true,
+        "sha1": "abfd8485d50a5f8dcc983b379f79409432c92eef",
+        "values_unique": {
+          "location_type": 1,
+          "stop_id": 3,
+          "stop_lat": 3,
+          "stop_lon": 1,
+          "stop_name": 3
+        },
+        "values_count": {
+          "location_type": 3,
+          "stop_id": 3,
+          "stop_lat": 3,
+          "stop_lon": 3,
+          "stop_name": 3
+        },
+        "feed_version_id": 0,
+        "id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "name": "trips.txt",
+        "size": 241,
+        "rows": 4,
+        "columns": 0,
+        "header": "route_id,service_id,trip_id,trip_headsign,direction_id,shape_id",
+        "csvlike": true,
+        "sha1": "13ca1dcf346c9b678ed916dd932ae26748092aee",
+        "values_unique": {
+          "direction_id": 2,
+          "route_id": 1,
+          "service_id": 1,
+          "shape_id": 2,
+          "trip_headsign": 2,
+          "trip_id": 4
+        },
+        "values_count": {
+          "direction_id": 4,
+          "route_id": 4,
+          "service_id": 4,
+          "shape_id": 4,
+          "trip_headsign": 4,
+          "trip_id": 4
+        },
+        "feed_version_id": 0,
+        "id": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z"
+      }
+    ],
+    "service_levels": null,
+    "realtime": null
+  },
+  "errors": {},
+  "warnings": {},
+  "id": 0,
+  "feed_version_id": 0,
+  "created_at": "0001-01-01T00:00:00Z",
+  "updated_at": "0001-01-01T00:00:00Z"
+}
