@@ -8,9 +8,9 @@
 
 ### Reconstruye la red de buses de una ciudad como un feed GTFS, con una persona aprobando cada decisión.
 
-Un pipeline y una consola de operador open source. Convierte datos abiertos de mapas y evidencia de campo en las rutas, paradas, trazados y horarios que necesitan las apps de transporte y quienes planifican la ciudad.
+Un pipeline y una consola de operador de código disponible (*source available*). Convierte datos abiertos de mapas y evidencia de campo en las rutas, paradas, trazados y horarios que necesitan las apps de transporte y quienes planifican la ciudad.
 
-[![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-17145e)](LICENSE)
+[![Licencia: Source Available](https://img.shields.io/badge/licencia-Source%20Available-17145e)](#licencia)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-17145e)
 ![PostgreSQL + PostGIS](https://img.shields.io/badge/PostgreSQL-PostGIS%20%C2%B7%20pgvector-17145e)
 ![Salida: GTFS](https://img.shields.io/badge/salida-GTFS-d99a2b)
@@ -163,7 +163,7 @@ La pantalla de inicio muestra los conteos canónicos (cada número está definid
 - 🏷️ **Nombrar rutas con evidencia**: adjuntar relaciones de OSM, horarios o declaraciones de operadores, y obtener candidatas de un matcher determinista y explicado.
 - 📦 **Construir y validar GTFS**: compilar el feed, revisarlo por capas y publicarlo localmente o en AWS tras una confirmación explícita.
 - 🤖 **Consultarlo desde herramientas de IA**: un servidor MCP de solo lectura ([detalles](#bajo-el-capó)) expone la base a clientes MCP.
-- 🌎 **Hacer un fork para tu ciudad**: cambiar la configuración regional y correr el mismo pipeline en otro lugar.
+- 🌎 **Adaptarlo a tu ciudad**: cambiar la configuración regional y correr el mismo pipeline para tu propia organización.
 
 ---
 
@@ -417,10 +417,23 @@ Los documentos de `docs/` están en inglés.
 | Orquestación (HADES) | [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md) · [docs/hades_pipeline_autopilot.md](docs/hades_pipeline_autopilot.md) |
 | Acceso a la base y seguridad | [docs/DB_ACCESS.md](docs/DB_ACCESS.md) · [docs/SECURITY_HYGIENE.md](docs/SECURITY_HYGIENE.md) |
 | Operación | [OPS.md](OPS.md) |
+| Licencias | [LICENSE](LICENSE) · [docs/COMMERCIAL-LICENSING.md](docs/COMMERCIAL-LICENSING.md) · [docs/legal/VERSIONS-AND-LICENSES.md](docs/legal/VERSIONS-AND-LICENSES.md) |
 
 ## Licencia
 
-[MIT](LICENSE)
+ML DataMind es de **código disponible** (*source available*) bajo la [ML DataMind Sustainable Use License](LICENSE) (borrador, pendiente de revisión jurídica).
+
+Eres libre de inspeccionar, modificar y usar ML DataMind con fines internos, de investigación, educativos y operativos.
+
+Ofrecer ML DataMind como servicio alojado, producto white-label, producto de reventa o un servicio comercial competidor sustancialmente equivalente requiere una licencia comercial.
+
+Las apps están permitidas: una app que consume GTFS u otros Outputs ya generados con ML DataMind es válida, y una app interna puede invocar ML DataMind en vivo para las personas de su propia organización. Si clientes o usuarios externos pueden invocar la funcionalidad de ML DataMind bajo demanda a través de tu app o servicio, directa o indirectamente, se necesita una licencia comercial.
+
+Las versiones publicadas antes de esta licencia (hasta el commit `33d2b20`, versión 0.1.0) siguen disponibles bajo la licencia MIT. Ver [LICENSE-MIT](LICENSE-MIT) y [Versiones y licencias](docs/legal/VERSIONS-AND-LICENSES.md).
+
+¿Te interesa el uso comercial o una alianza? [Escríbenos](docs/COMMERCIAL-LICENSING.md) o a josuearcos1307@gmail.com.
+
+¿Quieres contribuir? Empieza por [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Autores
 
