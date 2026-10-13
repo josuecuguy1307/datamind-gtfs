@@ -1,21 +1,233 @@
-MIT License
+# ML DataMind Sustainable Use License: Draft v0.2
 
-Copyright (c) 2026 Josué Arcos and Jhair Jiménez
+> **Draft — pending legal review.** This text has not been reviewed by a
+> lawyer. It states, in plain language, how the ML DataMind project wants its
+> code to be used. It must be reviewed by qualified legal counsel before it is
+> treated as final.
+>
+> **Source available, not open source.** This license is not approved by the
+> Open Source Initiative and does not meet the Open Source Definition, because
+> it limits some commercial uses (section 4).
+>
+> **Which versions this covers.** This license applies from the commit that adds
+> it, onward. Earlier versions of ML DataMind (through commit `d4875a8`, version
+> 0.1.0, published 29 September to 13 October 2026) stay under the MIT License,
+> which is preserved in [`LICENSE-MIT`](LICENSE-MIT). See section 9.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+## In short
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+**Free, no commercial license needed:** read, study, clone, modify, adapt and
+extend ML DataMind; keep private forks; use it internally in a company,
+university, municipality or transit operator; research and education;
+consulting and implementation; integrations; generating, publishing and selling
+GTFS feeds, datasets, reports and other Output; and building apps that consume
+that Output.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+**Commercial license needed:** only to offer ML DataMind itself, or a fork or
+substantial modification of it, to others as a product or service: SaaS or a
+hosted service, giving Third Parties access to its functionality (including on
+demand through another app or service), resale, white-label, or using it as the
+core of a product that competes directly with it.
+
+Writing your own system from scratch, with your own code, is never restricted.
+
+Copyright (c) 2026 Josué Arcos and Jhair Jiménez (the "Licensor").
+
+## 1. Definitions
+
+- **"Software"**: ML DataMind, meaning the source code, documentation,
+  configuration and other materials in this repository that carry this license,
+  together with any modifications you make to them.
+- **"You"**: the person or organization using the Software.
+- **"Organization"**: any legal entity, including a company, university, public
+  body, municipality, transit operator, non-profit or research group.
+- **"Output"**: the data, files and reports produced by running the Software,
+  such as GTFS feeds, route and stop datasets, and audit reports. Output is not
+  part of the Software.
+- **"Third Party"**: anyone other than You, your own Organization and the people
+  who work for it or for you under contract.
+- **"Hosted Offering"**: making the functionality of the Software available to
+  Third Parties as a service, instance, platform, API or subscription, whether
+  or not a fee is charged. Delivering Output to a Third Party is not a Hosted
+  Offering. Letting a Third Party run or use the Software is, including by
+  invoking its functionality on demand, directly or indirectly, through another
+  application or service.
+- **"Modified Version"**: the Software as modified, adapted or extended by
+  anyone, including a private fork.
+- **"Engine"**: the parts of the Software that reconstruct routes and stops,
+  name routes with evidence, and generate GTFS (the five-phase pipeline).
+
+## 2. Grant
+
+Subject to this license, the Licensor grants You a worldwide, royalty-free,
+non-exclusive license to use, copy, modify, create derivative works of and
+distribute the Software, for the permitted uses in section 3 and under the
+conditions in section 5. Nothing in this license lets You do what section 4
+restricts without a commercial license.
+
+## 3. Permitted uses
+
+You may:
+
+1. **Study** the code and learn from it.
+2. Use it for **personal** purposes, hobby projects and experiments.
+3. Use it for **research and education**, including at universities, and
+   publish papers, theses and teaching material about it.
+4. Use it **inside an Organization**, commercial or not, to process the data the
+   Organization owns or is entrusted with, including data of its clients. This
+   includes companies, municipal and other government bodies, transit operators
+   and consultancies. People working for the Organization under contract may
+   operate it on the Organization's behalf. An application inside the
+   Organization may invoke the Software live for the Organization's own
+   internal users (its people and those working for it under contract).
+5. **Produce, use, share, publish and sell Output**, subject to the licenses of
+   the underlying data (for example OpenStreetMap's ODbL). You may also build,
+   offer and sell applications, services and products that use or consume
+   Output, such as a trip-planning app that reads GTFS feeds produced with the
+   Software. Using Output does not make an application a competitor of ML
+   DataMind.
+6. Offer **professional services** around the Software, such as consulting,
+   training, implementation, customization and integration work, and charge for
+   your time and expertise, including running the Software to process a
+   client's data and delivering the resulting Output (see the example below).
+   You may not charge for the Software itself or for access to it (section 4).
+7. Build and share **integrations**: connectors, plugins, scripts and tools that
+   work with the Software through its documented interfaces (its database
+   schema, file formats and MCP server, for example) and do not include a
+   substantial part of the Software. Those works are yours and may carry any
+   license you choose.
+8. **Contribute** improvements to the project (see `CONTRIBUTING.md`).
+9. **Share copies** of the Software, modified or not, free of charge and under
+   this license, as section 5 describes.
+10. **Modify, adapt, extend and keep private forks.** Any person or
+    Organization may modify, adapt and extend the Software, maintain private
+    forks of it, and use those Modified Versions internally, as in items 2 to 4.
+    This needs no commercial license, and You are not required to publish Your
+    modifications.
+
+**Example: a consultancy.** A consultancy may run the Software to process a
+client's data, charge for that work, and deliver GTFS feeds, datasets, reports
+and other Output to the client, without a commercial license. It may also
+install and configure the Software on the client's own systems for the client's
+internal use, charging for its time and not for the Software. It needs a
+commercial license only if it gives the client hosted access to the Software,
+sells access to ML DataMind itself, or turns it into a SaaS, white-label or
+resale offering.
+
+## 4. Uses that need a commercial license
+
+A commercial license is needed only to offer ML DataMind itself, or a fork or
+substantial modification of it, to others as a product or service. Using it,
+modifying it and keeping forks inside Your Organization never needs one. Unless
+You hold a written commercial license from the Licensor, You may not:
+
+1. **Run a Hosted Offering or give access to it**: offer ML DataMind to Third
+   Parties as "ML DataMind as a Service", a hosted or managed instance, a
+   platform or an API, or otherwise let Third Parties use the functionality of
+   the Software, directly or indirectly, including through another application
+   or service.
+2. **Resell or white-label it**: sell, resell, license, sublicense or rent the
+   Software or access to it, including under a white-label, OEM or rebranded
+   arrangement.
+3. **Commercialize a fork**: offer, sell or distribute the Software, a fork of
+   it, or a substantially modified version of it, as a commercial product or
+   service, or as part of one, for a fee.
+4. **Build a competing product on it**: use the Software, its code, or a
+   Modified Version whose Engine substantially modifies the Software's Engine,
+   as the core of a software product or platform that competes directly with ML
+   DataMind. A product competes directly when it gives Third Parties the same
+   kind of capability as ML DataMind (reconstructing routes and stops, naming
+   routes with evidence, generating GTFS) as a tool or platform, rather than by
+   delivering Output or professional services.
+
+**Applications and services built around the Software.**
+
+- An application that consumes GTFS feeds, datasets or other Output already
+  generated with the Software is permitted.
+- An application inside an Organization may invoke the Software live for that
+  Organization's own internal users.
+- If an application or service lets customers or other external users invoke
+  the functionality of the Software on demand, directly or indirectly, that is a
+  Hosted Offering and needs a commercial license.
+
+These restrictions are about reusing, deriving from or commercializing the
+Software or a substantial modification of its code. They do **not** restrict:
+
+- creating, from scratch, another system that does something similar, even one
+  that competes with ML DataMind, as long as it uses Your own code;
+- using, selling or distributing Output, or building applications, services and
+  products that consume Output (section 3.5);
+- consulting, implementation and other professional services (section 3.6);
+- integrations, connectors and plugins that work with the Software through its
+  documented interfaces without including a substantial part of it
+  (section 3.7);
+- using the Software's documented interfaces inside Your own Organization;
+- knowledge, techniques or ideas learned from using or studying the Software;
+- modifying the Software and keeping private forks for internal use
+  (section 3.10).
+
+## 5. Conditions for sharing copies
+
+Using the Software and keeping Your modifications inside Your Organization is
+not "sharing", and You are not required to publish them. If You share the
+Software or a Modified Version with anyone outside Your Organization:
+
+- do it free of charge;
+- include this license, the copyright notice and the `LICENSE-MIT` file for the
+  earlier versions;
+- mark the files you changed;
+- do not remove or hide notices, and do not say or suggest that your version is
+  the official one or that the Licensor endorses it.
+
+Everyone who receives a copy from You receives a license from the Licensor on
+these same terms.
+
+## 6. Names and marks
+
+This license grants no rights to the names "ML DataMind" or "DataMind", to their
+logos, or to any other marks of the Licensor. You may use the name to state
+honestly where your work comes from or that it works with ML DataMind, for
+example "based on the ML DataMind source" or "works with ML DataMind".
+
+## 7. Third-party components and data
+
+Third-party components, libraries, tools and data keep their own licenses, and
+this license grants no rights in them. Published GTFS datasets are licensed
+separately by their own data license (the Open Database License 1.0 for the
+datasets published by the project) and are not covered by this license.
+
+## 8. Commercial licenses
+
+The Licensor may grant separate written licenses for the uses in section 4, on
+terms agreed case by case. To ask for one, write to
+josuearcos1307@gmail.com or see [`docs/COMMERCIAL-LICENSING.md`](docs/COMMERCIAL-LICENSING.md).
+
+## 9. Earlier versions
+
+Versions of the Software published before this license took effect remain
+available under the license that applied when they were published. This license
+does not take back or change any right granted for them. See
+[`docs/legal/VERSIONS-AND-LICENSES.md`](docs/legal/VERSIONS-AND-LICENSES.md).
+
+## 10. Ending of rights
+
+If You break section 4 or section 5, your rights under this license end
+automatically. If it was your first breach and You fully correct it within 30
+days after the Licensor notifies You in writing, your rights are restored.
+Ending your rights under this license does not affect rights You hold under a
+license to an earlier version or under a separate commercial license.
+
+## 11. No warranty and limit of liability
+
+The Software is provided "as is", without warranty of any kind, express or
+implied, including warranties of merchantability, fitness for a particular
+purpose and non-infringement. To the extent the law allows, the Licensor is not
+liable for any claim, damages or other liability arising from the Software or
+from its use.
+
+## 12. General
+
+If part of this license is found unenforceable, the rest stays in force. Not
+enforcing a term at one time does not waive it later.
+
+Governing law and venue: **[TO BE DEFINED WITH LEGAL COUNSEL]**.
