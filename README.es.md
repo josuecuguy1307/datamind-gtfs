@@ -16,10 +16,10 @@ Un pipeline y una consola de operador open source. Convierte datos abiertos de m
 ![Salida: GTFS](https://img.shields.io/badge/salida-GTFS-d99a2b)
 ![Revisión humana](https://img.shields.io/badge/revisi%C3%B3n-humana-d99a2b)
 ![Origen: Antari](https://img.shields.io/badge/naci%C3%B3%20de-la%20app%20Antari-5b5f73)
-[![Hecho con Claude Code](https://img.shields.io/badge/hecho%20con-Claude%20Code-D97757?logo=claude&logoColor=white)](#hecho-con-claude)
+[![MCP con Claude Code](https://img.shields.io/badge/MCP%20con-Claude%20Code-D97757?logo=claude&logoColor=white)](#mcp-con-claude-code)
 
 [**▶ Ver el recorrido por la consola**](#recorrido-por-la-consola) &nbsp;·&nbsp;
-[Hecho con Claude](#hecho-con-claude) &nbsp;·&nbsp;
+[MCP con Claude Code](#mcp-con-claude-code) &nbsp;·&nbsp;
 [Cómo funciona](#cómo-funciona) &nbsp;·&nbsp;
 [Flujo de trabajo](#flujo-de-trabajo-típico) &nbsp;·&nbsp;
 [Inicio rápido](#inicio-rápido) &nbsp;·&nbsp;
@@ -68,9 +68,9 @@ https://github.com/user-attachments/assets/f634cf72-a150-4647-8c69-1a7f9836e610
 
 ---
 
-## Hecho con Claude
+## MCP con Claude Code
 
-<a href="#hecho-con-claude"><img src="https://img.shields.io/badge/Hecho%20con-Claude%20Code-D97757?style=for-the-badge&logo=claude&logoColor=white" alt="Hecho con Claude Code"></a> <img src="https://img.shields.io/badge/conectado%20por-MCP%20·%20solo%20lectura-1f1b4d?style=for-the-badge&logo=claude&logoColor=white" alt="Conectado por MCP, solo lectura">
+<a href="#mcp-con-claude-code"><img src="https://img.shields.io/badge/MCP%20con-Claude%20Code-D97757?style=for-the-badge&logo=claude&logoColor=white" alt="MCP con Claude Code"></a> <img src="https://img.shields.io/badge/servidor%20MCP-18%20herramientas%20·%20solo%20lectura-1f1b4d?style=for-the-badge&logo=modelcontextprotocol&logoColor=white" alt="Servidor MCP: 18 herramientas, solo lectura">
 
 Durante dos meses llenamos los huecos de los datos casi a mano, y era lento. El 25 de febrero de 2026 sumamos a **Claude Code** al proyecto como orquestador del pipeline. Ejecutó nuestros motores fase por fase, siguiendo nuestros propios playbooks, y llegó a la base de datos a través de un **servidor MCP** que escribimos para él. El ritmo cambió en días.
 
