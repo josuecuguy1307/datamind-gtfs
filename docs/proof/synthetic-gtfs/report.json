@@ -1,0 +1,91 @@
+{
+  "summary": {
+    "validatorVersion": "7.1.0",
+    "validatedAt": "2026-10-13T13:07:58-05:00",
+    "gtfsInput": "file:///Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/clean-proof-checkout/.cache/synthetic-parser-proof/synthetic-gtfs.zip",
+    "threads": 1,
+    "outputDirectory": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/clean-proof-checkout/.cache/synthetic-parser-proof/validator",
+    "systemErrorsReportName": "system_errors.json",
+    "validationReportName": "report.json",
+    "htmlReportName": "report.html",
+    "countryCode": "ZZ",
+    "dateForValidation": "2026-10-13",
+    "feedInfo": {
+      "publisherName": "Synthetic DataMind Test Fixture (CC0)",
+      "publisherUrl": "https://example.org",
+      "feedLanguage": "inglés",
+      "feedStartDate": "2026-10-13",
+      "feedEndDate": "2027-10-12",
+      "feedEmail": "",
+      "feedServiceWindowStart": "2026-10-13",
+      "feedServiceWindowEnd": "2027-10-12"
+    },
+    "agencies": [
+      {
+        "name": "Synthetic DataMind Test Transit",
+        "url": "https://example.org",
+        "phone": "",
+        "email": "",
+        "timezone": "America/Mexico_City"
+      }
+    ],
+    "files": [
+      "agency.txt",
+      "calendar.txt",
+      "calendar_dates.txt",
+      "feed_info.txt",
+      "routes.txt",
+      "shapes.txt",
+      "stop_times.txt",
+      "stops.txt",
+      "trips.txt"
+    ],
+    "validationTimeSeconds": 0.084386709,
+    "memoryUsageRecords": [
+      {
+        "key": "GtfsFeedLoader.loadTables",
+        "totalMemory": 270532608,
+        "freeMemory": 127335840,
+        "maxMemory": 4294967296,
+        "diffMemory": -82793160
+      },
+      {
+        "key": "GtfsFeedLoader.executeMultiFileValidators",
+        "totalMemory": 270532608,
+        "freeMemory": 125691536,
+        "maxMemory": 4294967296,
+        "diffMemory": -1644304
+      },
+      {
+        "key": "org.mobilitydata.gtfsvalidator.table.GtfsFeedLoader.loadAndValidate",
+        "totalMemory": 270532608,
+        "freeMemory": 125691536,
+        "maxMemory": 4294967296,
+        "diffMemory": -85108368
+      },
+      {
+        "key": "ValidationRunner.run",
+        "totalMemory": 270532608,
+        "freeMemory": 124282576,
+        "maxMemory": 4294967296,
+        "diffMemory": -130488184
+      }
+    ],
+    "counts": {
+      "Shapes": 2,
+      "Stops": 3,
+      "Routes": 1,
+      "Trips": 4,
+      "Agencies": 1,
+      "Blocks": 0
+    },
+    "gtfsFeatures": [
+      "Shapes",
+      "Feed Information",
+      "Route Colors",
+      "Headsigns",
+      "Location Types"
+    ]
+  },
+  "notices": []
+}

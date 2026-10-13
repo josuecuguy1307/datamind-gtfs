@@ -1,0 +1,15 @@
+{
+  "notices": [
+    {
+      "code": "i_o_error",
+      "severity": "ERROR",
+      "totalNotices": 1,
+      "sampleNotices": [
+        {
+          "exception": "java.util.zip.ZipException",
+          "message": "Archive is not a ZIP archive"
+        }
+      ]
+    }
+  ]
+}

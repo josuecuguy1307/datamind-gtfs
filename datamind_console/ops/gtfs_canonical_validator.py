@@ -94,34 +94,47 @@ def build_command(java: str, jar: Path, zip_path: Path, output_dir: Path, *, cou
 
 def parse_report(report: dict[str, Any]) -> tuple[dict[str, int], list[dict[str, Any]], Optional[str]]:
     """Counts by severity and the notice list (largest first) from report.json."""
+    if not isinstance(report, dict) or not isinstance(report.get("notices"), list):
+        raise ValueError("report must contain a notices array")
+    summary = report.get("summary")
+    if not isinstance(summary, dict) or not isinstance(summary.get("validatorVersion"), str) or not summary["validatorVersion"]:
+        raise ValueError("report summary must identify validatorVersion")
     counts = {sev: 0 for sev in SEVERITIES}
     notices: list[dict[str, Any]] = []
-    for notice in report.get("notices") or []:
-        severity = str(notice.get("severity") or "INFO").upper()
-        total = int(notice.get("totalNotices") or 0)
-        counts[severity] = counts.get(severity, 0) + total
-        notices.append({"code": notice.get("code"), "severity": severity, "total": total})
-    notices.sort(key=lambda n: (SEVERITIES.index(n["severity"]) if n["severity"] in SEVERITIES else 9, -n["total"]))
-    version = (report.get("summary") or {}).get("validatorVersion")
-    return counts, notices, version
+    for notice in report["notices"]:
+        if not isinstance(notice, dict):
+            raise ValueError("notice must be an object")
+        severity = notice.get("severity")
+        total = notice.get("totalNotices")
+        if (severity not in SEVERITIES or not isinstance(notice.get("code"), str)
+                or not notice["code"] or type(total) is not int or total < 1):
+            raise ValueError("notice requires code, known severity and positive integer totalNotices")
+        counts[severity] += total
+        notices.append({"code": notice["code"], "severity": severity, "total": total})
+    notices.sort(key=lambda n: (SEVERITIES.index(n["severity"]), -n["total"]))
+    return counts, notices, summary.get("validatorVersion")
 
 
 def _system_errors(out_dir: Path) -> list[dict[str, Any]]:
     path = out_dir / "system_errors.json"
     if not path.is_file():
-        return []
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except ValueError:
-        return [{"code": "unreadable_system_errors_report", "severity": "SYSTEM", "total": 1}]
-    return [
-        {"code": n.get("code"), "severity": "SYSTEM", "total": int(n.get("totalNotices") or 1)}
-        for n in (data.get("notices") or [])
-    ]
+        raise ValueError("missing system_errors.json")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or not isinstance(data.get("notices"), list):
+        raise ValueError("system_errors report must contain a notices array")
+    errors = []
+    for notice in data["notices"]:
+        if not isinstance(notice, dict) or not isinstance(notice.get("code"), str):
+            raise ValueError("invalid system error notice")
+        total = notice.get("totalNotices", 1)
+        if type(total) is not int or total < 1:
+            raise ValueError("invalid system error totalNotices")
+        errors.append({"code": notice["code"], "severity": "SYSTEM", "total": total})
+    return errors
 
 
 def default_output_dir(zip_path: Path) -> Path:
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     base = Path(tempfile.gettempdir()) / "datamind_gtfs_validator"
     return base / f"{zip_path.stem}_{stamp}"
 
@@ -141,21 +154,34 @@ def run_validator(
     if not Path(zip_path).exists():
         return ValidatorResult(ok=False, status="error", stderr_tail=f"input not found: {zip_path}")
     out_dir = output_dir or default_output_dir(zip_path)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    timeout = int(timeout_s or os.getenv("GTFS_VALIDATOR_TIMEOUT_S", "600") or 600)
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        if any((out_dir / name).exists() for name in ("report.json", "system_errors.json", "report.html")):
+            raise ValueError("output directory already contains a report; use a fresh directory")
+        timeout = int(timeout_s or os.getenv("GTFS_VALIDATOR_TIMEOUT_S", "600") or 600)
+        if timeout < 1:
+            raise ValueError("timeout must be positive")
+    except (OSError, ValueError) as exc:
+        return ValidatorResult(ok=False, status="error", output_dir=out_dir, stderr_tail=str(exc))
     cmd = build_command(avail.java, avail.jar, zip_path, out_dir, country_code=country_code)
     try:
         proc = runner(cmd, capture_output=True, text=True, timeout=timeout, check=False)
     except subprocess.TimeoutExpired:
         return ValidatorResult(ok=False, status="error", output_dir=out_dir, stderr_tail=f"timed out after {timeout}s")
+    except OSError as exc:
+        return ValidatorResult(ok=False, status="error", output_dir=out_dir, stderr_tail=str(exc))
     report_path = out_dir / "report.json"
     if not report_path.is_file():
         return ValidatorResult(
             ok=False, status="error", output_dir=out_dir, returncode=proc.returncode,
-            stderr_tail=(proc.stderr or proc.stdout or "")[-2000:],
+            stderr_tail=(proc.stderr or proc.stdout or "missing report.json")[-2000:],
         )
-    counts, notices, version = parse_report(json.loads(report_path.read_text(encoding="utf-8")))
-    system_errors = _system_errors(out_dir)
+    try:
+        counts, notices, version = parse_report(json.loads(report_path.read_text(encoding="utf-8")))
+        system_errors = _system_errors(out_dir)
+    except (OSError, ValueError, TypeError) as exc:
+        return ValidatorResult(ok=False, status="error", output_dir=out_dir,
+                               returncode=proc.returncode, stderr_tail=f"invalid validator report: {exc}")
     html = out_dir / "report.html"
     if proc.returncode != 0 or system_errors:
         # The validator could not read or fully process the feed: never
