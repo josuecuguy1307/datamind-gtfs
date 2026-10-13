@@ -48,7 +48,7 @@ https://github.com/user-attachments/assets/f634cf72-a150-4647-8c69-1a7f9836e610
 - **Dale una estrella a ML DataMind** si este flujo de trabajo es relevante para ti.
 - **[Prueba la demostración GTFS sintética para consumidores](https://github.com/josuecuguy1307/datamind-gtfs/blob/34856474e8e520ae7e12d429a9d4d584aa12f28b/docs/SYNTHETIC_GTFS_PROOF.md)** propuesta en el [PR #1](https://github.com/josuecuguy1307/datamind-gtfs/pull/1), sin datos privados de Ecuador ni una base de datos. Es una muestra de prueba inventada, no un feed operativo ni una prueba de reconstrucción de principio a fin.
 - **[Trae tu ciudad](https://github.com/josuecuguy1307/datamind-gtfs/issues/new?template=city-data.md)**: describe la ciudad, las fuentes disponibles, las rutas, paradas u horarios faltantes, la cobertura OSM y dónde se rompe tu flujo de trabajo.
-- **Conversa sobre GTFS, OSM, validación y operación asistida por MCP** en el hilo de tu ciudad. Los motores del pipeline y la revisión humana conservan la autoridad; la asistencia de IA no autoriza publicar.
+- **[Únete a la comunidad de ML DataMind](https://discord.gg/QBw2A236ps)** en `#ml-datamind` para conversar sobre GTFS, OSM, validación y operación asistida por MCP. Los motores del pipeline y la revisión humana conservan la autoridad; la asistencia de IA no autoriza publicar.
 
 ---
 
