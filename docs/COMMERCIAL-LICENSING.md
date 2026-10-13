@@ -82,5 +82,5 @@ different.
 
 ## Earlier versions
 
-Versions published before the license change (through commit `33d2b20`) stay under
+Versions published before the license change (through commit `d4875a8`) stay under
 the MIT License. See [`docs/legal/VERSIONS-AND-LICENSES.md`](legal/VERSIONS-AND-LICENSES.md).

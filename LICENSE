@@ -10,7 +10,7 @@
 > it limits some commercial uses (section 4).
 >
 > **Which versions this covers.** This license applies from the commit that adds
-> it, onward. Earlier versions of ML DataMind (through commit `33d2b20`, version
+> it, onward. Earlier versions of ML DataMind (through commit `d4875a8`, version
 > 0.1.0, published 29 September to 13 October 2026) stay under the MIT License,
 > which is preserved in [`LICENSE-MIT`](LICENSE-MIT). See section 9.
 

@@ -436,7 +436,7 @@ Offering ML DataMind as a hosted service, white-label product, resale product, o
 
 Apps are fine: an app that consumes GTFS feeds or other Output already generated with ML DataMind is allowed, and an internal app can call ML DataMind live for the organization's own people. If outside customers or users can invoke ML DataMind's functionality on demand through your app or service, directly or indirectly, that needs a commercial license.
 
-Versions published before this license (through commit `33d2b20`, version 0.1.0) remain available under the MIT License. See [LICENSE-MIT](LICENSE-MIT) and [Versions and licenses](docs/legal/VERSIONS-AND-LICENSES.md).
+Versions published before this license (through commit `d4875a8`, version 0.1.0) remain available under the MIT License. See [LICENSE-MIT](LICENSE-MIT) and [Versions and licenses](docs/legal/VERSIONS-AND-LICENSES.md).
 
 Interested in commercial use or partnership? [Contact us](docs/COMMERCIAL-LICENSING.md) or write to josuearcos1307@gmail.com.
 
