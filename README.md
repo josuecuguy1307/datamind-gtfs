@@ -43,6 +43,15 @@ https://github.com/user-attachments/assets/f634cf72-a150-4647-8c69-1a7f9836e610
 
 ---
 
+## Building transit data for a city?
+
+- **Star ML DataMind** if this workflow is relevant to your work.
+- **[Try the synthetic GTFS consumer proof](https://github.com/josuecuguy1307/datamind-gtfs/blob/34856474e8e520ae7e12d429a9d4d584aa12f28b/docs/SYNTHETIC_GTFS_PROOF.md)** proposed in [PR #1](https://github.com/josuecuguy1307/datamind-gtfs/pull/1), without private Ecuador data or a database. It is an invented test fixture, not an operational feed or an end-to-end reconstruction proof.
+- **[Bring your city](https://github.com/josuecuguy1307/datamind-gtfs/issues/new?template=city-data.md)**: describe your city, available sources, missing routes, stops or schedules, OSM coverage and where your workflow breaks.
+- **[Join the ML DataMind community](https://discord.gg/58qExtuE5p)** in `#ml-datamind` to discuss GTFS, OSM, validation and MCP-assisted operation. Pipeline engines and human review remain authoritative; AI assistance does not authorize publishing.
+
+---
+
 ## Why DataMind exists
 
 <table>
