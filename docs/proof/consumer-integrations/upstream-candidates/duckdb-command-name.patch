@@ -1,0 +1,20 @@
+diff --git a/cli.js b/cli.js
+index b5292bb..7edaeb5 100755
+--- a/cli.js
++++ b/cli.js
+@@ -69 +69 @@ Usage:
+-    import-gtfs-into-duckdb [options] [--] <path-to-duckdb> <gtfs-file> ...
++    gtfs-to-duckdb [options] [--] <path-to-duckdb> <gtfs-file> ...
+@@ -118 +118 @@ Examples:
+-    import-gtfs-into-duckdb some-gtfs.duckdb some-gtfs/*.txt
++    gtfs-to-duckdb some-gtfs.duckdb some-gtfs/*.txt
+diff --git a/readme.md b/readme.md
+index 6fae06f..8ab9a7f 100644
+--- a/readme.md
++++ b/readme.md
+@@ -142 +142 @@ Usage:
+-    import-gtfs-into-duckdb [options] [--] <path-to-duckdb> <gtfs-file> ...
++    gtfs-to-duckdb [options] [--] <path-to-duckdb> <gtfs-file> ...
+@@ -191 +191 @@ Examples:
+-    import-gtfs-into-duckdb some-gtfs.duckdb some-gtfs/*.txt
++    gtfs-to-duckdb some-gtfs.duckdb some-gtfs/*.txt

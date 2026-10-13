@@ -1,0 +1,6 @@
+........................................................................ [ 75%]
+......................ss                                                 [100%]
+=========================== short test summary info ============================
+SKIPPED [1] datamind_console/tests/test_human_review_integration.py:79: set DATAMIND_DISPOSABLE_TEST_DSN to a disposable database
+SKIPPED [1] datamind_console/tests/test_human_review_integration.py:88: set DATAMIND_DISPOSABLE_TEST_DSN to a disposable database
+94 passed, 2 skipped in 0.52s

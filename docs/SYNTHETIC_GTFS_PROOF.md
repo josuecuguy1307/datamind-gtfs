@@ -112,3 +112,9 @@ increasing times through 24:35:00, and proof/wrapper failure states. Validator
 unit tests simulate process/report failures; the recorded proof runs the real
 Java validator. See `docs/proof/synthetic-gtfs/` for actual run evidence and the
 executed test command/results.
+
+## Further consumer checks
+
+[Three consumer proofs](GTFS_CONSUMER_PROOFS.md) import the identical fixture
+with pinned PostgreSQL, DuckDB and Transitland consumers, including the known
+PostgreSQL shape-SRID defect and explicit workaround.
