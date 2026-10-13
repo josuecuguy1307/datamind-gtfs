@@ -23,6 +23,10 @@ def ready(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 
 
 def _runner(report: dict | None, *, returncode: int = 0, system_errors: dict | None = None):
+    if isinstance(report, dict) and isinstance(report.get("notices"), list) and "summary" not in report:
+        report = {"summary": {"validatorVersion": "7.1.0"}, **report}
+    if system_errors is None:
+        system_errors = {"notices": []}
     calls: list[list[str]] = []
 
     def _run(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess:
@@ -92,3 +96,78 @@ def test_unavailable_without_java_or_jar(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert not avail.ready and set(avail.missing) == {"jar", "java"}
     res = v.run_validator(tmp_path / "x.zip", output_dir=tmp_path / "out")
     assert res.status == "error"
+
+
+@pytest.mark.parametrize("report", [None, {}, [], {"notices": None}, {"notices": {}},
+    {"notices": [None]}, {"notices": [{"code": "bad", "severity": "UNKNOWN", "totalNotices": 1}]},
+    {"notices": [{"code": "bad", "severity": "ERROR", "totalNotices": -1}]},
+    {"notices": [{"code": "bad", "severity": "ERROR", "totalNotices": "1"}]},
+    {"notices": [{"code": "bad", "severity": "ERROR", "totalNotices": True}]},
+    {"notices": [], "summary": []}])
+def test_malformed_report_never_passes(ready, tmp_path, report):
+    result = v.run_validator(ready, output_dir=tmp_path / "out", runner=_runner(report))
+    assert not result.ok and result.status == "error"
+
+
+@pytest.mark.parametrize("filename,content", [("report.json", "{broken"),
+    ("system_errors.json", "{broken"), ("system_errors.json", "[]"),
+    ("system_errors.json", '{}'), ("system_errors.json", '{"notices":[null]}')])
+def test_unreadable_json_never_passes(ready, tmp_path, filename, content):
+    def runner(cmd, **kwargs):
+        out = Path(cmd[cmd.index("-o") + 1])
+        (out / "report.json").write_text('{"summary":{"validatorVersion":"7.1.0"},"notices":[]}')
+        (out / filename).write_text(content)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    result = v.run_validator(ready, output_dir=tmp_path / "out", runner=runner)
+    assert not result.ok and result.status == "error"
+
+
+def test_stale_report_refused(ready, tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "report.json").write_text('{"summary":{"validatorVersion":"7.1.0"},"notices":[]}')
+    runner = _runner(None)
+    result = v.run_validator(ready, output_dir=out, runner=runner)
+    assert result.status == "error" and not result.ok
+    assert not runner.calls
+
+
+@pytest.mark.parametrize("exception", [FileNotFoundError("java missing"), PermissionError("denied"),
+                                      subprocess.TimeoutExpired("java", 1)])
+def test_process_exception_never_passes(ready, tmp_path, exception):
+    def runner(*args, **kwargs):
+        raise exception
+    result = v.run_validator(ready, output_dir=tmp_path / "out", runner=runner)
+    assert result.status == "error" and not result.ok
+
+
+def test_system_error_with_zero_exit_never_passes(ready, tmp_path):
+    result = v.run_validator(ready, output_dir=tmp_path / "out",
+        runner=_runner({"notices": []}, system_errors={"notices": [{"code": "system_failure"}]}))
+    assert result.status == "error" and not result.ok
+
+
+def test_failed_process_with_empty_report_never_passes(ready, tmp_path):
+    result = v.run_validator(ready, output_dir=tmp_path / "out", runner=_runner({"notices": []}, returncode=1))
+    assert result.status == "error" and not result.ok
+
+
+@pytest.mark.parametrize("report", [{"notices": []}, {"summary": {}, "notices": []},
+    {"summary": {"validatorVersion": None}, "notices": []}])
+def test_missing_version_is_an_error(ready, tmp_path, report):
+    def runner(cmd, **kwargs):
+        out = Path(cmd[cmd.index("-o") + 1])
+        (out / "report.json").write_text(json.dumps(report))
+        (out / "system_errors.json").write_text('{"notices":[]}')
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    result = v.run_validator(ready, output_dir=tmp_path / "out", runner=runner)
+    assert result.status == "error" and not result.ok
+
+
+def test_missing_system_errors_report_is_an_error(ready, tmp_path):
+    def runner(cmd, **kwargs):
+        out = Path(cmd[cmd.index("-o") + 1])
+        (out / "report.json").write_text('{"summary":{"validatorVersion":"7.1.0"},"notices":[]}')
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    result = v.run_validator(ready, output_dir=tmp_path / "out", runner=runner)
+    assert result.status == "error" and not result.ok

@@ -1,0 +1,15 @@
+{
+  "summary": {
+    "validatorVersion": "7.1.0",
+    "validatedAt": "2026-10-13T13:08:40-05:00",
+    "gtfsInput": "file:///Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/clean-proof-checkout/.cache/not-a-feed.zip",
+    "threads": 1,
+    "outputDirectory": "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/clean-proof-checkout/.cache/negative-real-validator",
+    "systemErrorsReportName": "system_errors.json",
+    "validationReportName": "report.json",
+    "htmlReportName": "report.html",
+    "countryCode": "ZZ",
+    "dateForValidation": "2026-10-13"
+  },
+  "notices": []
+}

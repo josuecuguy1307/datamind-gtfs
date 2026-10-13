@@ -21,8 +21,9 @@ is never shown as passed.
 
 ## The MobilityData validator
 
-`tools/gtfs-validator.jar` (MobilityData 7.1.0) was in the repository but was
-never called. It now runs only when the operator presses the button:
+The wrapper defaults to `tools/gtfs-validator.jar` (MobilityData 7.x), but
+the public checkout does not include that binary. Configure `GTFS_VALIDATOR_JAR`
+or supply the JAR locally. It runs only when the operator presses the button:
 
 ```bash
 java -jar tools/gtfs-validator.jar -i <feed.zip> -o <report dir> -svu -p [-c <country>]
@@ -32,7 +33,9 @@ java -jar tools/gtfs-validator.jar -i <feed.zip> -o <report dir> -svu -p [-c <co
 
 * the input file does not exist;
 * `java` or the jar is missing;
-* the process exits non-zero or times out;
+* the process exits non-zero, cannot launch, or times out;
+* reports are missing, malformed, lack a validator version, or the output
+  directory already contains reports from another run;
 * `system_errors.json` contains any notice (the validator writes an empty
   `report.json` and exit code 255 for a missing input; an earlier version of
   the wrapper read that as a pass).
@@ -63,3 +66,10 @@ Publishing remains a human action.
   both in the page and inside the publish actions
   (`datamind_console/ops/gtfs_quarantine.py`). An unreadable registry refuses
   every publish. Remove an entry only after the artifact passes with 0 errors.
+
+## Reproducible public consumer fixture
+
+See [Synthetic GTFS proof](SYNTHETIC_GTFS_PROOF.md) for a DB-free, CC0 fixture,
+checksum-pinned validator command, independent parser smoke check, raw evidence
+and explicit limits. This validates a synthetic consumer feed; it does not
+reconstruct a reviewed Phase 5 database export or authorize publication.

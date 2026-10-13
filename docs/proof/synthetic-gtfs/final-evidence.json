@@ -1,0 +1,159 @@
+{
+  "status": "pass",
+  "synthetic": true,
+  "fixture_kind": "DB-free consumer fixture; not a Phase 5 export",
+  "license": "CC0-1.0",
+  "timestamp_utc": "2026-10-13T18:09:08.497985+00:00",
+  "invocation": [
+    "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/proof-venv/bin/python",
+    "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/clean-proof-checkout/scripts/synthetic_gtfs_proof.py",
+    "--output",
+    "../clean-proof-checkout/.cache/final-proof",
+    "--cache",
+    "../clean-proof-checkout/.cache/gtfs-proof",
+    "--start-date",
+    "2026-10-13",
+    "--parser-smoke"
+  ],
+  "validator_release": "7.1.0",
+  "validator_jar_url": "https://github.com/MobilityData/gtfs-validator/releases/download/v7.1.0/gtfs-validator-7.1.0-cli.jar",
+  "validator_jar_sha256": "52c2785089aaf04e7ba1bb11b2db215692e2622eb0e196b823c194d156d9b58c",
+  "service_start": "2026-10-13",
+  "feed_sha256": "602b8192c4f91f5f064942e582db4bb6bbded89c83c1ddde49207ad1eeb6eea5",
+  "structure": {
+    "ok": true,
+    "errors": [],
+    "warnings": [],
+    "checksum_sha256": "602b8192c4f91f5f064942e582db4bb6bbded89c83c1ddde49207ad1eeb6eea5",
+    "files": [
+      "agency.txt",
+      "calendar.txt",
+      "calendar_dates.txt",
+      "feed_info.txt",
+      "routes.txt",
+      "shapes.txt",
+      "stop_times.txt",
+      "stops.txt",
+      "trips.txt"
+    ],
+    "csv_checks": {
+      "calendar.txt": {
+        "header": [
+          "service_id",
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday",
+          "start_date",
+          "end_date"
+        ],
+        "row_count": 1,
+        "column_count": 10
+      },
+      "calendar_dates.txt": {
+        "header": [
+          "service_id",
+          "date",
+          "exception_type"
+        ],
+        "row_count": 1,
+        "column_count": 3
+      },
+      "routes.txt": {
+        "header": [
+          "route_id",
+          "agency_id",
+          "route_short_name",
+          "route_long_name",
+          "route_type",
+          "route_color",
+          "route_text_color"
+        ],
+        "row_count": 1,
+        "column_count": 7
+      },
+      "stop_times.txt": {
+        "header": [
+          "trip_id",
+          "arrival_time",
+          "departure_time",
+          "stop_id",
+          "stop_sequence",
+          "timepoint",
+          "shape_dist_traveled"
+        ],
+        "row_count": 12,
+        "column_count": 7
+      },
+      "stops.txt": {
+        "header": [
+          "stop_id",
+          "stop_name",
+          "stop_lat",
+          "stop_lon",
+          "location_type"
+        ],
+        "row_count": 3,
+        "column_count": 5
+      },
+      "trips.txt": {
+        "header": [
+          "route_id",
+          "service_id",
+          "trip_id",
+          "trip_headsign",
+          "direction_id",
+          "shape_id"
+        ],
+        "row_count": 4,
+        "column_count": 6
+      }
+    },
+    "validated_at": "2026-10-13T18:09:08.500663+00:00",
+    "size_bytes": 2973
+  },
+  "java_version": "openjdk version \"21.0.8\" 2025-07-15\nOpenJDK Runtime Environment Homebrew (build 21.0.8)\nOpenJDK 64-Bit Server VM Homebrew (build 21.0.8, mixed mode, sharing)",
+  "validator_command": [
+    "/usr/bin/java",
+    "-jar",
+    "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/clean-proof-checkout/.cache/gtfs-proof/gtfs-validator-7.1.0-cli.jar",
+    "-i",
+    "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/clean-proof-checkout/.cache/final-proof/synthetic-gtfs.zip",
+    "-o",
+    "/Users/bebeta/Documents/Codex/2026-10-13/datamind-validation-proof/work/clean-proof-checkout/.cache/final-proof/validator",
+    "-svu",
+    "-p"
+  ],
+  "validator": {
+    "status": "pass",
+    "counts": {
+      "ERROR": 0,
+      "WARNING": 0,
+      "INFO": 0
+    },
+    "notices": [],
+    "version": "7.1.0",
+    "returncode": 0,
+    "stderr_tail": "reignKeyValidator\n   GtfsFareLegRuleFromAreaIdForeignKeyValidator\n   GtfsFareLegRuleFromTimeframeGroupIdForeignKeyValidator\n   GtfsFareLegRuleToAreaIdForeignKeyValidator\n   GtfsFareLegRuleToTimeframeGroupIdForeignKeyValidator\n   GtfsFareProductFareMediaIdForeignKeyValidator\n   GtfsFareProductRiderCategoryIdForeignKeyValidator\n   GtfsFareRuleContainsIdForeignKeyValidator\n   GtfsFareRuleDestinationIdForeignKeyValidator\n   GtfsFareRuleFareIdForeignKeyValidator\n   GtfsFareRuleOriginIdForeignKeyValidator\n   GtfsFareRuleRouteIdForeignKeyValidator\n   GtfsFareTransferRuleFareProductIdForeignKeyValidator\n   GtfsFareTransferRuleFromLegGroupIdForeignKeyValidator\n   GtfsFareTransferRuleToLegGroupIdForeignKeyValidator\n   GtfsFrequencyTripIdForeignKeyValidator\n   GtfsPathwayFromStopIdForeignKeyValidator\n   GtfsPathwayToStopIdForeignKeyValidator\n   GtfsRouteNetworkNetworkIdForeignKeyValidator\n   GtfsRouteNetworkRouteIdForeignKeyValidator\n   GtfsStopAreaAreaIdForeignKeyValidator\n   GtfsStopAreaStopIdForeignKeyValidator\n   GtfsStopLevelIdForeignKeyValidator\n   GtfsStopParentStationForeignKeyValidator\n   GtfsStopTimeDropOffBookingRuleIdForeignKeyValidator\n   GtfsStopTimeLocationGroupIdForeignKeyValidator\n   GtfsStopTimePickupBookingRuleIdForeignKeyValidator\n   GtfsTransferFromRouteIdForeignKeyValidator\n   GtfsTransferFromStopIdForeignKeyValidator\n   GtfsTransferFromTripIdForeignKeyValidator\n   GtfsTransferToRouteIdForeignKeyValidator\n   GtfsTransferToStopIdForeignKeyValidator\n   GtfsTransferToTripIdForeignKeyValidator\n   LocationIdForeignKeyValidator\n   PickupBookingRuleIdValidator\n   TransferDistanceValidator\noct 13, 2026 1:09:09 P.\u00a0M. org.mobilitydata.gtfsvalidator.runner.ValidationRunner printSummary\nINFORMACI\u00d3N: Validation took 0.085 seconds\n\noct 13, 2026 1:09:09 P.\u00a0M. org.mobilitydata.gtfsvalidator.runner.ValidationRunner printSummary\nINFORMACI\u00d3N: agency.txt\t1\ncalendar.txt\t1\ncalendar_dates.txt\t1\nfeed_info.txt\t1\nroutes.txt\t1\nshapes.txt\t6\nstop_times.txt\t12\nstops.txt\t3\ntrips.txt\t4\n"
+  },
+  "parser": {
+    "status": "pass",
+    "name": "partridge",
+    "version": "1.1.2",
+    "rows": {
+      "agency": 1,
+      "stops": 3,
+      "routes": 1,
+      "trips": 4,
+      "stop_times": 12,
+      "shapes": 6,
+      "calendar": 1,
+      "calendar_dates": 1,
+      "feed_info": 1
+    },
+    "max_departure_seconds": 88500.0
+  }
+}

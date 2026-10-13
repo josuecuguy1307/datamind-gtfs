@@ -228,6 +228,11 @@ python scripts/load_sample_data.py
 
 It loads 3 routes, 26 stops and 6 places of an invented city. It is repeatable, and `--remove` deletes only the sample rows.
 
+For a database-free GTFS consumer fixture with a pinned MobilityData validator,
+recorded checksums and an optional Partridge smoke check, see
+[Synthetic GTFS proof](docs/SYNTHETIC_GTFS_PROOF.md). This separate CC0 fixture
+does not reconstruct the reviewed Phase 5 export pipeline.
+
 **5. Start the console**
 
 ```bash
