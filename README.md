@@ -2,7 +2,7 @@
 
 [Español](README.es.md) · **English**
 
-<img src="docs/media/logo.svg" alt="ML DataMind logo" width="84">
+<img src="docs/media/logo.svg" alt="ML DataMind logo" width="84"><a href="#mcp-with-claude-code"><img src="docs/media/claude-mark.svg" alt="with Claude" height="84"></a>
 
 # ML DataMind
 
